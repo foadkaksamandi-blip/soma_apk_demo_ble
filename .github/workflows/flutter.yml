@@ -31,8 +31,7 @@ jobs:
           flutter pub add flutter_blue_plus
           flutter pub add mobile_scanner
           flutter pub add qr_flutter
-          cat > lib/main.dart <<'DART'
-import 'package:flutter/material.dart';
+          echo "import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -92,7 +91,7 @@ class _HomePageState extends State<HomePage> {
               child: const Text('Scan QR'),
             ),
             const SizedBox(height: 24),
-            Text('Log: $log'),
+            Text('Log: \$log'),
           ],
         ),
       ),
@@ -125,13 +124,12 @@ class QrScanPage extends StatelessWidget {
       body: MobileScanner(
         onDetect: (capture) {
           final barcode = capture.barcodes.isNotEmpty ? capture.barcodes.first.rawValue : null;
-          debugPrint('QR: $barcode');
+          debugPrint('QR: \$barcode');
         },
       ),
     );
   }
-}
-DART
+}" > lib/main.dart
 
       - name: Build release APK
         working-directory: soma_demo
