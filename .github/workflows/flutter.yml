@@ -1,4 +1,4 @@
-name: Flutter CI (compat fixed)
+name: Flutter CI (compat fixed + auto patch)
 
 on:
   push:
@@ -17,7 +17,7 @@ jobs:
           distribution: temurin
           java-version: '11'
 
-      # نسخه Flutter که هم با Gradle و هم با TextTheme جدید هماهنگ است
+      # نسخه Flutter هماهنگ با Gradle و Material جدید
       - name: Set up Flutter 3.3.10
         uses: subosito/flutter-action@v2
         with:
@@ -31,6 +31,16 @@ jobs:
       - name: Pub get (example)
         working-directory: example
         run: flutter pub get
+
+      # اصلاح خودکار ویجت‌ها و فیلدهای حذف‌شده در نسخه جدید
+      - name: Patch deprecated widgets
+        working-directory: example/lib
+        run: |
+          find . -type f -name "*.dart" -exec sed -i \
+          -e 's/FlatButton/TextButton/g' \
+          -e 's/RaisedButton/ElevatedButton/g' \
+          -e 's/subhead/titleMedium/g' \
+          -e 's/body1/bodyLarge/g' {} +
 
       - name: Build APK (example)
         working-directory: example
