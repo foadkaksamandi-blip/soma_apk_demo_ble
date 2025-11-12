@@ -1,4 +1,4 @@
-name: Flutter CI (compat fixed + auto patch)
+name: Flutter CI (compat fixed + auto patch final)
 
 on:
   push:
@@ -40,7 +40,9 @@ jobs:
           -e 's/FlatButton/TextButton/g' \
           -e 's/RaisedButton/ElevatedButton/g' \
           -e 's/subhead/titleMedium/g' \
-          -e 's/body1/bodyLarge/g' {} +
+          -e 's/body1/bodyLarge/g' \
+          -e 's/color:/style: ElevatedButton.styleFrom(backgroundColor:/g' \
+          -e 's/);/));/g' {} +
 
       - name: Build APK (example)
         working-directory: example
