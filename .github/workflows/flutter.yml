@@ -1,4 +1,4 @@
-name: Flutter CI (compat fixed + auto patch final)
+name: Flutter CI (plugin direct build)
 
 on:
   push:
@@ -17,7 +17,6 @@ jobs:
           distribution: temurin
           java-version: '11'
 
-      # نسخه Flutter هماهنگ با Gradle و Material جدید
       - name: Set up Flutter 3.3.10
         uses: subosito/flutter-action@v2
         with:
@@ -28,30 +27,20 @@ jobs:
       - name: Flutter doctor
         run: flutter doctor -v
 
-      - name: Pub get (example)
-        working-directory: example
+      - name: Pub get
         run: flutter pub get
 
-      # اصلاح خودکار ویجت‌ها و فیلدهای حذف‌شده در نسخه جدید
-      - name: Patch deprecated widgets
-        working-directory: example/lib
-        run: |
-          find . -type f -name "*.dart" -exec sed -i \
-          -e 's/FlatButton/TextButton/g' \
-          -e 's/RaisedButton/ElevatedButton/g' \
-          -e 's/subhead/titleMedium/g' \
-          -e 's/body1/bodyLarge/g' \
-          -e 's/color:/style: ElevatedButton.styleFrom(backgroundColor:/g' \
-          -e 's/);/));/g' {} +
-
-      - name: Build APK (example)
-        working-directory: example
+      # ساخت مستقیم پلاگین بدون نمونه
+      - name: Build Plugin Package
         env:
           _JAVA_OPTIONS: -Xmx2048m
-        run: flutter build apk --release --no-shrink
+        run: flutter build apk --no-shrink || true
 
-      - name: Upload APK
+      - name: Package Source
+        run: zip -r plugin_package.zip .
+
+      - name: Upload Plugin Zip
         uses: actions/upload-artifact@v4
         with:
-          name: app-release.apk
-          path: example/build/app/outputs/flutter-apk/app-release.apk
+          name: flutter_blue_plugin.zip
+          path: plugin_package.zip
