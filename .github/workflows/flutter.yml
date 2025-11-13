@@ -1,129 +1,151 @@
-name: Flutter CI
+name: Soma Demo APK
 
 on:
   push:
-    branches: [ "master" ]
+  pull_request:
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Set up job
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '17'
 
-      - name: Set up Flutter 3.10.5
+      - name: Set up Flutter (stable)
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.10.5"
+          channel: stable
+          cache: true
 
-      - name: Flutter doctor
-        run: flutter doctor -v
-
-      # --- ایجاد کامل پروژه فلاتر ---
-      - name: Create Flutter project
+      - name: Create app & deps
         run: |
-          flutter create soma_demo
-          rm -rf soma_demo/lib/main.dart
+          flutter --version
+          rm -rf soma_demo || true
+          flutter create --platforms=android soma_demo
+          cd soma_demo
+          flutter pub add flutter_blue_plus
+          flutter pub add mobile_scanner
+          flutter pub add qr_flutter
 
-      # --- قرار دادن کل main.dart ---
       - name: Write main.dart
-        working-directory: soma_demo/lib
-        run: |
-          cat > main.dart <<'DART'
-import 'package:flutter/material.dart';
-import 'package:flutter_blue/flutter_blue.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:qr_code_scanner/qr_code_scanner.dart';
-
-void main() {
-  runApp(const SomaApp());
-}
-
-class SomaApp extends StatelessWidget {
-  const SomaApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: const SomaHome(),
-    );
-  }
-}
-
-class SomaHome extends StatefulWidget {
-  const SomaHome({super.key});
-
-  @override
-  State<SomaHome> createState() => _SomaHomeState();
-}
-
-class _SomaHomeState extends State<SomaHome> {
-  final FlutterBlue flutterBlue = FlutterBlue.instance;
-  String log = "Idle";
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("SOMA Demo")),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            ElevatedButton(
-              onPressed: () async {
-                setState(() => log = "Scanning BLE...");
-                flutterBlue.startScan(timeout: const Duration(seconds: 3));
-              },
-              child: const Text("Scan Bluetooth"),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () {},
-              child: const Text("Show My QR"),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () {},
-              child: const Text("Scan QR"),
-            ),
-            const SizedBox(height: 24),
-            Text("Log: $log"),
-          ],
-        ),
-      ),
-    );
-  }
-}
-DART
-
-      # --- افزودن دسترسی‌های اندروید ---
-      - name: Patch Android permissions
         working-directory: soma_demo
+        shell: bash
         run: |
-          MANIFEST=android/app/src/main/AndroidManifest.xml
-          sed -i 's#</manifest>#  <uses-permission android:name="android.permission.BLUETOOTH"/>\n  <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>\n  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n  <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />\n  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n  <uses-permission android:name="android.permission.CAMERA"/>\n</manifest>#' $MANIFEST
+          mkdir -p lib
+          cat > lib/main.dart <<'DART'
+          import 'package:flutter/material.dart';
+          import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+          import 'package:mobile_scanner/mobile_scanner.dart';
+          import 'package:qr_flutter/qr_flutter.dart';
 
-      # --- نصب پکیج‌ها ---
-      - name: Pub get
-        working-directory: soma_demo
-        run: flutter pub add flutter_blue qr_flutter qr_code_scanner
+          void main() => runApp(const SomaDemo());
 
-      # --- بیلد APK ---
-      - name: Build APK
+          class SomaDemo extends StatelessWidget {
+            const SomaDemo({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                title: 'SOMA Offline Demo',
+                theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
+                home: const HomePage(),
+              );
+            }
+          }
+
+          class HomePage extends StatefulWidget {
+            const HomePage({super.key});
+            @override
+            State<HomePage> createState() => _HomePageState();
+          }
+
+          class _HomePageState extends State<HomePage> {
+            String log = 'Ready';
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('SOMA Demo')),
+                body: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ListView(
+                    children: [
+                      FilledButton(
+                        onPressed: () async {
+                          setState(() => log = 'Scanning BLE…');
+                          await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
+                          final results = await FlutterBluePlus.scanResults.first;
+                          setState(() => log = 'Found ${results.length} devices');
+                          FlutterBluePlus.stopScan();
+                        },
+                        child: const Text('Scan Bluetooth'),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.tonal(
+                        onPressed: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const QrShowPage()));
+                        },
+                        child: const Text('Show My QR'),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: () {
+                          Navigator.push(context, MaterialPageRoute(builder: (_) => const QrScanPage()));
+                        },
+                        child: const Text('Scan QR'),
+                      ),
+                      const SizedBox(height: 24),
+                      Text('Log: $log'),
+                    ],
+                  ),
+                ),
+              );
+            }
+          }
+
+          class QrShowPage extends StatelessWidget {
+            const QrShowPage({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('My QR')),
+                body: Center(
+                  child: QrImageView(
+                    data: 'SOMA-DEMO-12345',
+                    size: 220,
+                  ),
+                ),
+              );
+            }
+          }
+
+          class QrScanPage extends StatelessWidget {
+            const QrScanPage({super.key});
+            @override
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(title: const Text('Scan QR')),
+                body: MobileScanner(
+                  onDetect: (capture) {
+                    final barcode = capture.barcodes.isNotEmpty ? capture.barcodes.first.rawValue : null;
+                    debugPrint('QR: $barcode');
+                  },
+                ),
+              );
+            }
+          }
+          DART
+
+      - name: Build release APK
         working-directory: soma_demo
         run: flutter build apk --release --no-shrink
 
-      # --- خروجی گرفتن APK ---
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: SOMA_DEMO_APK
+          name: soma_demo_app-release.apk
           path: soma_demo/build/app/outputs/flutter-apk/app-release.apk
