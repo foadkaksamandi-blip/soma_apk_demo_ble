@@ -7,7 +7,6 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,10 +17,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Flutter
+      - name: Set up Flutter (stable)
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
 
       - name: Create app & deps
         run: |
@@ -30,17 +30,13 @@ jobs:
           flutter create --platforms=android soma_demo
           cd soma_demo
           flutter pub add flutter_blue_plus
-          flutter pub add mobile_scanner
-          flutter pub add qr_flutter
 
-      - name: Write main.dart (buyer app with BT page)
+      - name: Write main.dart
         working-directory: soma_demo
         shell: bash
         run: |
           mkdir -p lib
           cat > lib/main.dart <<'DART'
-          import 'dart:async';
-
           import 'package:flutter/material.dart';
           import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
@@ -54,32 +50,21 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return MaterialApp(
-                debugShowCheckedModeBanner: false,
                 title: 'اپ آفلاین سوما',
+                debugShowCheckedModeBanner: false,
                 theme: ThemeData(
                   useMaterial3: true,
                   colorSchemeSeed: Colors.teal,
-                  fontFamily: 'sans',
                 ),
                 home: const BuyerHomePage(),
               );
             }
           }
 
-          enum WalletType { main, subsidy, emergency, digitalRial }
-
-          class PaymentData {
-            final int amount;
-            final WalletType wallet;
-            final String walletTitle;
-            final String txCode;
-
-            const PaymentData({
-              required this.amount,
-              required this.wallet,
-              required this.walletTitle,
-              required this.txCode,
-            });
+          class _Wallet {
+            final String name;
+            final int balance;
+            const _Wallet(this.name, this.balance);
           }
 
           /// صفحه اول – اپ خریدار
@@ -91,96 +76,76 @@ jobs:
           }
 
           class _BuyerHomePageState extends State<BuyerHomePage> {
-            final int _mainBalance = 1200000;
-            final int _subsidyBalance = 400000;
-            final int _emergencyBalance = 250000;
-            final int _digitalRialBalance = 0;
+            final List<_Wallet> _wallets = const [
+              _Wallet('موجودی اصلی', 120000),
+              _Wallet('موجودی یارانه‌ای', 400000),
+              _Wallet('موجودی اضطراری ملی', 250000),
+              _Wallet('ریال دیجیتال ملی', 0),
+            ];
 
-            WalletType _selectedWallet = WalletType.main;
-
-            final TextEditingController _amountController =
-                TextEditingController();
-            final TextEditingController _txController = TextEditingController();
-
-            String _status = 'موجودی اصلی برای پرداخت انتخاب شده است.';
+            int _selectedWalletIndex = 0;
+            final TextEditingController _amountController = TextEditingController();
+            final TextEditingController _txCodeController = TextEditingController();
+            String _statusText = 'وضعیت: موجودی اصلی برای پرداخت انتخاب شد';
 
             @override
             void dispose() {
               _amountController.dispose();
-              _txController.dispose();
+              _txCodeController.dispose();
               super.dispose();
             }
 
-            String _walletTitle(WalletType t) {
-              switch (t) {
-                case WalletType.main:
-                  return 'موجودی اصلی';
-                case WalletType.subsidy:
-                  return 'موجودی یارانه‌ای';
-                case WalletType.emergency:
-                  return 'موجودی اضطراری ملی';
-                case WalletType.digitalRial:
-                  return 'ریال دیجیتال ملی';
-              }
-            }
-
-            int _walletBalance(WalletType t) {
-              switch (t) {
-                case WalletType.main:
-                  return _mainBalance;
-                case WalletType.subsidy:
-                  return _subsidyBalance;
-                case WalletType.emergency:
-                  return _emergencyBalance;
-                case WalletType.digitalRial:
-                  return _digitalRialBalance;
-              }
-            }
-
-            void _onSelectWallet(WalletType t) {
+            void _updateStatus() {
+              final walletName = _wallets[_selectedWalletIndex].name;
               setState(() {
-                _selectedWallet = t;
-                _status = '${_walletTitle(t)} برای پرداخت انتخاب شد.';
+                _statusText = 'وضعیت: $walletName برای پرداخت انتخاب شد';
               });
             }
 
-            void _startBluetoothPayment() {
-              final text =
-                  _amountController.text.replaceAll(',', '').trim();
-              if (text.isEmpty) {
-                setState(() {
-                  _status = 'لطفاً مبلغ پرداخت را وارد کنید.';
-                });
+            int? _parseAmount() {
+              final raw = _amountController.text.trim().replaceAll('٬', '').replaceAll(',', '');
+              if (raw.isEmpty) return null;
+              final value = int.tryParse(raw);
+              return value;
+            }
+
+            void _goToBluetooth() {
+              final amount = _parseAmount();
+              if (amount == null || amount <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('لطفاً مبلغ پرداخت را به‌صورت عددی وارد کنید.')),
+                );
                 return;
               }
 
-              final amount = int.tryParse(text) ?? 0;
-              if (amount <= 0) {
-                setState(() {
-                  _status = 'مبلغ واردشده نامعتبر است.';
-                });
-                return;
-              }
-
-              final balance = _walletBalance(_selectedWallet);
-              if (amount > balance) {
-                setState(() {
-                  _status = 'مبلغ بیشتر از موجودی کیف پول انتخاب‌شده است.';
-                });
-                return;
-              }
-
-              final data = PaymentData(
-                amount: amount,
-                wallet: _selectedWallet,
-                walletTitle: _walletTitle(_selectedWallet),
-                txCode: _txController.text.trim(),
-              );
-
+              final walletName = _wallets[_selectedWalletIndex].name;
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => BluetoothPaymentPage(data: data),
+                  builder: (_) => BluetoothPaymentPage(
+                    amount: amount,
+                    walletName: walletName,
+                  ),
+                ),
+              );
+            }
+
+            void _goToQrDemo() {
+              final amount = _parseAmount();
+              if (amount == null || amount <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('لطفاً مبلغ پرداخت را به‌صورت عددی وارد کنید.')),
+                );
+                return;
+              }
+              final walletName = _wallets[_selectedWalletIndex].name;
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => QrPaymentDemoPage(
+                    amount: amount,
+                    walletName: walletName,
+                  ),
                 ),
               );
             }
@@ -192,153 +157,569 @@ jobs:
                 child: Scaffold(
                   appBar: AppBar(
                     title: const Text('اپ آفلاین سوما'),
-                    centerTitle: true,
                   ),
-                  body: Padding(
+                  body: SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
-                    child: ListView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Align(
                           alignment: Alignment.centerRight,
                           child: Text(
                             'اپ خریدار',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                           ),
                         ),
                         const SizedBox(height: 16),
-
-                        // کارت موجودی اصلی
-                        Container(
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.teal.shade50,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'موجودی اصلی',
-                                style: TextStyle(fontSize: 18),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                '$_mainBalance تومان',
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        _buildBalanceCard(),
                         const SizedBox(height: 24),
-
                         const Text(
                           'انتخاب نحوه پرداخت',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 12),
-
-                        FilledButton(
-                          onPressed: _startBluetoothPayment,
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.bluetooth),
-                              SizedBox(width: 8),
-                              Text('پرداخت با بلوتوث'),
-                            ],
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: _goToBluetooth,
+                            child: const Text('پرداخت با بلوتوث'),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        FilledButton.tonal(
-                          onPressed: () {
-                            // بعداً صفحه QR را اضافه می‌کنیم
-                          },
-                          child: const Text('پرداخت با QR کد'),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.tonal(
+                            onPressed: _goToQrDemo,
+                            child: const Text('پرداخت با QR کد'),
+                          ),
                         ),
-
                         const SizedBox(height: 24),
-
                         const Text(
                           'انتخاب کیف پول برای پرداخت',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 12),
-
-                        _WalletCard(
-                          title: 'موجودی اصلی',
-                          subtitle: 'موجودی: $_mainBalance تومان',
-                          selected: _selectedWallet == WalletType.main,
-                          onTap: () => _onSelectWallet(WalletType.main),
-                        ),
-                        _WalletCard(
-                          title: 'موجودی یارانه‌ای',
-                          subtitle: 'موجودی: $_subsidyBalance تومان',
-                          selected: _selectedWallet == WalletType.subsidy,
-                          onTap: () => _onSelectWallet(WalletType.subsidy),
-                        ),
-                        _WalletCard(
-                          title: 'موجودی اضطراری ملی',
-                          subtitle: 'موجودی: $_emergencyBalance تومان',
-                          selected: _selectedWallet == WalletType.emergency,
-                          onTap: () => _onSelectWallet(WalletType.emergency),
-                        ),
-                        _WalletCard(
-                          title: 'ریال دیجیتال ملی',
-                          subtitle: 'موجودی: $_digitalRialBalance تومان',
-                          selected: _selectedWallet == WalletType.digitalRial,
-                          onTap: () => _onSelectWallet(WalletType.digitalRial),
-                        ),
-
-                        const SizedBox(height: 24),
-
+                        ...List.generate(_wallets.length, (index) {
+                          final w = _wallets[index];
+                          final selected = index == _selectedWalletIndex;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _selectedWalletIndex = index;
+                                });
+                                _updateStatus();
+                              },
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: selected ? Colors.teal.withOpacity(0.1) : Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: selected ? Colors.teal : Colors.grey.shade300,
+                                    width: 1.4,
+                                  ),
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            w.name,
+                                            style: const TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'موجودی: ${w.balance} تومان',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey.shade700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Radio<int>(
+                                      value: index,
+                                      groupValue: _selectedWalletIndex,
+                                      onChanged: (v) {
+                                        if (v == null) return;
+                                        setState(() {
+                                          _selectedWalletIndex = v;
+                                        });
+                                        _updateStatus();
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                        const SizedBox(height: 16),
                         const Text(
                           'مبلغ پرداخت (تومان)',
-                          style: TextStyle(fontSize: 16),
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 8),
                         TextField(
                           controller: _amountController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            hintText: 'مثلاً ۲۵۰۰۰۰',
+                          decoration: InputDecoration(
+                            hintText: 'مثلاً ۲۵۰۰۰ تومان',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 16),
-
                         const Text(
                           'کد تراکنش',
-                          style: TextStyle(fontSize: 16),
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 8),
                         TextField(
-                          controller: _txController,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
+                          controller: _txCodeController,
+                          decoration: InputDecoration(
                             hintText: 'کد / شناسه تراکنش',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: () {
+                              _updateStatus();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('اطلاعات پرداخت ثبت شد. اکنون روش پرداخت را انتخاب کنید.'),
+                                ),
+                              );
+                            },
+                            child: const Text('تأیید و شروع پرداخت'),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          _statusText,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            Widget _buildBalanceCard() {
+              final w = _wallets[_selectedWalletIndex];
+              return Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'موجودی اصلی',
+                      style: TextStyle(fontSize: 15),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${w.balance} تومان',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+
+          enum ConnectionStatus {
+            idle,
+            scanning,
+            notFound,
+            found,
+            connecting,
+            connected,
+            error,
+          }
+
+          /// صفحه دوم – پرداخت با بلوتوث
+          class BluetoothPaymentPage extends StatefulWidget {
+            final int amount;
+            final String walletName;
+
+            const BluetoothPaymentPage({
+              super.key,
+              required this.amount,
+              required this.walletName,
+            });
+
+            @override
+            State<BluetoothPaymentPage> createState() => _BluetoothPaymentPageState();
+          }
+
+          class _BluetoothPaymentPageState extends State<BluetoothPaymentPage> {
+            List<ScanResult> _scanResults = [];
+            BluetoothDevice? _selectedDevice;
+            ConnectionStatus _status = ConnectionStatus.idle;
+            bool _isScanning = false;
+
+            String get _statusText {
+              switch (_status) {
+                case ConnectionStatus.idle:
+                  return 'برای شروع جست‌وجو، دکمه اسکن با بلوتوث را بزنید.';
+                case ConnectionStatus.scanning:
+                  return 'در حال جست‌وجو برای اپ‌های فروشنده نزدیک…';
+                case ConnectionStatus.notFound:
+                  return 'هیچ اپ فروشنده مجاز (با شناسه SOMA-) پیدا نشد.';
+                case ConnectionStatus.found:
+                  return 'فروشنده‌های مجاز پیدا شد. لطفاً یکی را انتخاب کنید.';
+                case ConnectionStatus.connecting:
+                  return 'اپ فروشنده انتخاب شد. در حال برقراری اتصال امن…';
+                case ConnectionStatus.connected:
+                  return 'اتصال امن برقرار شد. می‌توانید پرداخت را انجام دهید.';
+                case ConnectionStatus.error:
+                  return 'خطا در اتصال. لطفاً دوباره تلاش کنید.';
+              }
+            }
+
+            bool get _canConfirm {
+              return _selectedDevice != null && _status == ConnectionStatus.connected;
+            }
+
+            Future<void> _startScan() async {
+              setState(() {
+                _isScanning = true;
+                _status = ConnectionStatus.scanning;
+                _scanResults = [];
+                _selectedDevice = null;
+              });
+
+              try {
+                await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
+                final results = await FlutterBluePlus.scanResults.first;
+                await FlutterBluePlus.stopScan();
+
+                final filtered = results.where((r) {
+                  final name = r.device.platformName.toUpperCase();
+                  return name.contains('SOMA') || name.contains('STORE');
+                }).toList();
+
+                setState(() {
+                  _scanResults = filtered;
+                  if (_scanResults.isEmpty) {
+                    _status = ConnectionStatus.notFound;
+                  } else {
+                    _status = ConnectionStatus.found;
+                  }
+                });
+              } catch (e) {
+                setState(() {
+                  _status = ConnectionStatus.error;
+                });
+              } finally {
+                setState(() {
+                  _isScanning = false;
+                });
+              }
+            }
+
+            void _selectDevice(ScanResult r) {
+              setState(() {
+                _selectedDevice = r.device;
+                _status = ConnectionStatus.connecting;
+              });
+
+              // شبیه‌سازی برقراری اتصال امن در دمو
+              Future.delayed(const Duration(seconds: 1), () {
+                if (!mounted) return;
+                setState(() {
+                  _status = ConnectionStatus.connected;
+                });
+              });
+            }
+
+            void _confirmAndSend() {
+              if (!_canConfirm) return;
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('پرداخت با موفقیت انجام شد.'),
+                ),
+              );
+
+              Navigator.pop(context);
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              final amountText = '${widget.amount} تومان';
+
+              return Directionality(
+                textDirection: TextDirection.rtl,
+                child: Scaffold(
+                  appBar: AppBar(
+                    title: const Text('اپ آفلاین سوما'),
+                  ),
+                  body: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'اپ خریدار',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'پرداخت با بلوتوث',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // کارت خلاصه پرداخت
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'مبلغ خرید: $amountText',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'کیف پول انتخاب‌شده: ${widget.walletName}',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 24),
-
-                        FilledButton(
-                          onPressed: _startBluetoothPayment,
-                          child: const Text('تأیید و شروع پرداخت'),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: _isScanning ? null : _startScan,
+                            child: Text(
+                              _isScanning ? 'در حال اسکن بلوتوث…' : 'اسکن با بلوتوث',
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 20),
+                        _buildSellerBox(),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'وضعیت اتصال',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          padding: const EdgeInsets.all(12),
+                          child: Text(
+                            _statusText,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton(
+                            onPressed: _isScanning ? null : _startScan,
+                            child: const Text('جست‌وجوی مجدد با بلوتوث'),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: _canConfirm ? _confirmAndSend : null,
+                            child: const Text('تأیید و ارسال پرداخت'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
 
-                        Text('وضعیت: $_status'),
+            Widget _buildSellerBox() {
+              if (_status == ConnectionStatus.scanning) {
+                return Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    children: const [
+                      SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Text('در حال جست‌وجو برای اپ‌های فروشنده نزدیک…'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              if (_scanResults.isEmpty) {
+                return Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  padding: const EdgeInsets.all(12),
+                  child: const Text(
+                    'هنوز فروشنده‌ای پیدا نشده است. لطفاً اسکن را شروع کنید.',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                );
+              }
+
+              return Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  children: _scanResults.map((r) {
+                    final device = r.device;
+                    final name = device.platformName.isNotEmpty
+                        ? device.platformName
+                        : 'Unknown (${device.remoteId.str})';
+                    final selected = _selectedDevice?.remoteId == device.remoteId;
+                    return RadioListTile<BluetoothDevice>(
+                      value: device,
+                      groupValue: _selectedDevice,
+                      onChanged: (d) {
+                        if (d != null) {
+                          _selectDevice(r);
+                        }
+                      },
+                      activeColor: Colors.teal,
+                      title: Text(name),
+                      subtitle: const Text('فروشنده مجاز نزدیک'),
+                      selected: selected,
+                    );
+                  }).toList(),
+                ),
+              );
+            }
+          }
+
+          /// صفحه دمو برای پرداخت با QR (فعلاً ساده)
+          class QrPaymentDemoPage extends StatelessWidget {
+            final int amount;
+            final String walletName;
+
+            const QrPaymentDemoPage({
+              super.key,
+              required this.amount,
+              required this.walletName,
+            });
+
+            @override
+            Widget build(BuildContext context) {
+              final amountText = '$amount تومان';
+
+              return Directionality(
+                textDirection: TextDirection.rtl,
+                child: Scaffold(
+                  appBar: AppBar(
+                    title: const Text('اپ آفلاین سوما'),
+                  ),
+                  body: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'اپ خریدار',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'پرداخت با QR کد (دمو)',
+                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.teal.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'مبلغ خرید: $amountText',
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'کیف پول انتخاب‌شده: $walletName',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'در نسخه نهایی، در این صفحه QR پرداخت خریدار نمایش و اسکن می‌شود.\n'
+                          'فعلاً این صفحه فقط برای تست ساخت APK است.',
+                          style: TextStyle(fontSize: 14),
+                        ),
                       ],
                     ),
                   ),
@@ -346,23 +727,14 @@ jobs:
               );
             }
           }
+          DART
 
-          class _WalletCard extends StatelessWidget {
-            final String title;
-            final String subtitle;
-            final bool selected;
-            final VoidCallback onTap;
+      - name: Build release APK
+        working-directory: soma_demo
+        run: flutter build apk --release --no-shrink
 
-            const _WalletCard({
-              required this.title,
-              required this.subtitle,
-              required this.selected,
-              required this.onTap,
-            });
-
-            @override
-            Widget build(BuildContext context) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: InkWell,
-0
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: soma_demo_app-release.apk
+          path: soma_demo/build/app/outputs/flutter-apk/app-release.apk
