@@ -48,19 +48,10 @@ jobs:
             runApp(const SomaOfflineBuyerApp());
           }
 
-          // ------------------ مدل‌ها و داده‌های دمو ------------------
+          // -------- مدل ساده تراکنش برای دمو --------
 
-          enum PaymentMethod {
-            bluetooth,
-            qr,
-          }
-
-          enum TransactionStatus {
-            offlineOnly,
-            pendingBank,
-            confirmed,
-            failed,
-          }
+          enum PaymentMethod { bluetooth, qr }
+          enum TransactionStatus { confirmed }
 
           class TransactionRecord {
             final int amount;
@@ -68,11 +59,8 @@ jobs:
             final PaymentMethod method;
             final String sellerName;
             final DateTime createdAt;
-            final DateTime? sentToBankAt;
-            final DateTime? bankConfirmedAt;
             final String localId;
-            final String? bankReference;
-            final TransactionStatus status;
+            final String bankRef;
 
             TransactionRecord({
               required this.amount,
@@ -80,11 +68,8 @@ jobs:
               required this.method,
               required this.sellerName,
               required this.createdAt,
-              this.sentToBankAt,
-              this.bankConfirmedAt,
               required this.localId,
-              this.bankReference,
-              required this.status,
+              required this.bankRef,
             });
           }
 
@@ -95,31 +80,22 @@ jobs:
             required String walletName,
             required PaymentMethod method,
             required String sellerName,
-            TransactionStatus status = TransactionStatus.confirmed,
           }) {
             final now = DateTime.now();
-            final record = TransactionRecord(
-              amount: amount,
-              walletName: walletName,
-              method: method,
-              sellerName: sellerName,
-              createdAt: now,
-              sentToBankAt: now,
-              bankConfirmedAt:
-                  status == TransactionStatus.confirmed ? now : null,
-              localId: 'SOMA-${now.millisecondsSinceEpoch}',
-              bankReference: status == TransactionStatus.confirmed
-                  ? 'BNK${100000 + demoTransactions.length}'
-                  : null,
-              status: status,
-            );
-            demoTransactions.add(record);
-            demoTransactions.sort(
-              (a, b) => b.createdAt.compareTo(a.createdAt),
+            demoTransactions.add(
+              TransactionRecord(
+                amount: amount,
+                walletName: walletName,
+                method: method,
+                sellerName: sellerName,
+                createdAt: now,
+                localId: 'SOMA-${now.millisecondsSinceEpoch}',
+                bankRef: 'BNK${100000 + demoTransactions.length}',
+              ),
             );
           }
 
-          // ------------------ اپ اصلی ------------------
+          // ---------------- اپ اصلی ----------------
 
           class SomaOfflineBuyerApp extends StatelessWidget {
             const SomaOfflineBuyerApp({super.key});
@@ -144,7 +120,7 @@ jobs:
             const _Wallet(this.name, this.balance);
           }
 
-          // ------------------ صفحه اول – اپ خریدار ------------------
+          // ---------------- صفحه ۱ – اپ خریدار ----------------
 
           class BuyerHomePage extends StatefulWidget {
             const BuyerHomePage({super.key});
@@ -189,8 +165,7 @@ jobs:
                   .replaceAll('٬', '')
                   .replaceAll(',', '');
               if (raw.isEmpty) return null;
-              final value = int.tryParse(raw);
-              return value;
+              return int.tryParse(raw);
             }
 
             void _goToBluetooth() {
@@ -204,7 +179,6 @@ jobs:
                 );
                 return;
               }
-
               final walletName = _wallets[_selectedWalletIndex].name;
               Navigator.push(
                 context,
@@ -217,7 +191,7 @@ jobs:
               );
             }
 
-            void _goToQrDemo() {
+            void _goToQr() {
               final amount = _parseAmount();
               if (amount == null || amount <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -256,11 +230,13 @@ jobs:
                 child: Scaffold(
                   appBar: AppBar(
                     title: const Text('اپ آفلاین سوما'),
-                  ),
-                  floatingActionButton: FloatingActionButton.extended(
-                    onPressed: _goToHistory,
-                    icon: const Icon(Icons.receipt_long),
-                    label: const Text('گزارش تراکنش‌ها'),
+                    actions: [
+                      IconButton(
+                        onPressed: _goToHistory,
+                        icon: const Icon(Icons.receipt_long),
+                        tooltip: 'گزارش تراکنش‌ها',
+                      ),
+                    ],
                   ),
                   body: SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
@@ -299,7 +275,7 @@ jobs:
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.tonal(
-                            onPressed: _goToQrDemo,
+                            onPressed: _goToQr,
                             child: const Text('پرداخت با QR کد'),
                           ),
                         ),
@@ -486,7 +462,7 @@ jobs:
             }
           }
 
-          // ------------------ صفحه دوم – پرداخت با بلوتوث ------------------
+          // -------------- صفحه ۲ – پرداخت با بلوتوث --------------
 
           enum ConnectionStatus {
             idle,
@@ -527,11 +503,11 @@ jobs:
                 case ConnectionStatus.scanning:
                   return 'در حال جست‌وجو برای اپ‌های فروشنده نزدیک…';
                 case ConnectionStatus.notFound:
-                  return 'هیچ اپ فروشنده مجاز (با شناسه SOMA-) پیدا نشد.';
+                  return 'هیچ اپ فروشنده مجاز پیدا نشد.';
                 case ConnectionStatus.found:
                   return 'فروشنده‌های مجاز پیدا شد. لطفاً یکی را انتخاب کنید.';
                 case ConnectionStatus.connecting:
-                  return 'اپ فروشنده انتخاب شد. در حال برقراری اتصال امن…';
+                  return 'در حال برقراری اتصال امن…';
                 case ConnectionStatus.connected:
                   return 'اتصال امن برقرار شد. می‌توانید پرداخت را ارسال کنید.';
                 case ConnectionStatus.error:
@@ -539,10 +515,9 @@ jobs:
               }
             }
 
-            bool get _canConfirm {
-              return _selectedDevice != null &&
-                  _status == ConnectionStatus.connected;
-            }
+            bool get _canConfirm =>
+                _selectedDevice != null &&
+                _status == ConnectionStatus.connected;
 
             Future<void> _startScan() async {
               setState(() {
@@ -551,26 +526,21 @@ jobs:
                 _scanResults = [];
                 _selectedDevice = null;
               });
-
               try {
                 await FlutterBluePlus.startScan(
                   timeout: const Duration(seconds: 5),
                 );
                 final results = await FlutterBluePlus.scanResults.first;
                 await FlutterBluePlus.stopScan();
-
                 final filtered = results.where((r) {
                   final name = r.device.platformName.toUpperCase();
                   return name.contains('SOMA') || name.contains('STORE');
                 }).toList();
-
                 setState(() {
                   _scanResults = filtered;
-                  if (_scanResults.isEmpty) {
-                    _status = ConnectionStatus.notFound;
-                  } else {
-                    _status = ConnectionStatus.found;
-                  }
+                  _status = _scanResults.isEmpty
+                      ? ConnectionStatus.notFound
+                      : ConnectionStatus.found;
                 });
               } catch (_) {
                 setState(() {
@@ -588,8 +558,6 @@ jobs:
                 _selectedDevice = r.device;
                 _status = ConnectionStatus.connecting;
               });
-
-              // شبیه‌سازی برقراری اتصال امن در دمو
               Future.delayed(const Duration(seconds: 1), () {
                 if (!mounted) return;
                 setState(() {
@@ -600,33 +568,27 @@ jobs:
 
             void _confirmAndSend() {
               if (!_canConfirm) return;
-
               final sellerName =
                   _selectedDevice?.platformName.isNotEmpty == true
                       ? _selectedDevice!.platformName
                       : 'اپ فروشنده ناشناس';
-
               addDemoTransaction(
                 amount: widget.amount,
                 walletName: widget.walletName,
                 method: PaymentMethod.bluetooth,
                 sellerName: sellerName,
-                status: TransactionStatus.confirmed,
               );
-
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('پرداخت با موفقیت انجام شد.'),
                 ),
               );
-
               Navigator.pop(context);
             }
 
             @override
             Widget build(BuildContext context) {
               final amountText = '${widget.amount} تومان';
-
               return Directionality(
                 textDirection: TextDirection.rtl,
                 child: Scaffold(
@@ -649,14 +611,11 @@ jobs:
                           ),
                         ),
                         const SizedBox(height: 16),
-                        const Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            'پرداخت با بلوتوث',
-                            style: TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                            ),
+                        const Text(
+                          'پرداخت با بلوتوث',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -694,9 +653,7 @@ jobs:
                           child: FilledButton(
                             onPressed: _isScanning ? null : _startScan,
                             child: Text(
-                              _isScanning
-                                  ? 'در حال اسکن بلوتوث…'
-                                  : 'اسکن با بلوتوث',
+                              _isScanning ? 'در حال اسکن بلوتوث…' : 'اسکن با بلوتوث',
                             ),
                           ),
                         ),
@@ -834,13 +791,9 @@ jobs:
             }
           }
 
-          // ------------------ صفحه سوم – پرداخت با QR کد ------------------
+          // -------------- صفحه ۳ – پرداخت با QR دوحالته --------------
 
-          enum QrMode {
-            none,
-            showMy,
-            scanSeller,
-          }
+          enum QrMode { none, showMy, scanSeller }
 
           class QrPaymentPage extends StatefulWidget {
             final int amount;
@@ -870,9 +823,7 @@ jobs:
 
             bool get _canConfirm {
               if (_mode == QrMode.showMy) return true;
-              if (_mode == QrMode.scanSeller && _scannedData != null) {
-                return true;
-              }
+              if (_mode == QrMode.scanSeller && _scannedData != null) return true;
               return false;
             }
 
@@ -893,7 +844,9 @@ jobs:
             }
 
             void _onScanDetect(BarcodeCapture capture) {
-              final barcode = capture.barcodes.firstOrNull;
+              final barcode = capture.barcodes.isEmpty
+                  ? null
+                  : capture.barcodes.first;
               final raw = barcode?.rawValue;
               if (raw == null || raw.isEmpty) return;
               setState(() {
@@ -904,24 +857,20 @@ jobs:
 
             void _confirmAndSend() {
               if (!_canConfirm) return;
-
-              final sellerName =
-                  _mode == QrMode.showMy ? 'فروشنده اسکن‌کننده QR' : 'فروشنده با QR اسکن‌شده';
-
+              final sellerName = _mode == QrMode.showMy
+                  ? 'فروشنده اسکن‌کننده QR'
+                  : 'فروشنده با QR اسکن‌شده';
               addDemoTransaction(
                 amount: widget.amount,
                 walletName: widget.walletName,
                 method: PaymentMethod.qr,
                 sellerName: sellerName,
-                status: TransactionStatus.confirmed,
               );
-
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('پرداخت با موفقیت انجام شد.'),
                 ),
               );
-
               Navigator.pop(context);
             }
 
@@ -1094,20 +1043,17 @@ jobs:
                 );
               }
 
-              // scan seller
               return Container(
                 width: double.infinity,
+                height: 260,
                 decoration: BoxDecoration(
                   color: Colors.black,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: Colors.grey.shade300),
                 ),
-                height: 260,
                 child: Stack(
                   children: [
-                    MobileScanner(
-                      onDetect: _onScanDetect,
-                    ),
+                    MobileScanner(onDetect: _onScanDetect),
                     const Align(
                       alignment: Alignment.topCenter,
                       child: Padding(
@@ -1127,82 +1073,12 @@ jobs:
             }
           }
 
-          extension FirstOrNullExtension<E> on Iterable<E> {
-            E? get firstOrNull => isEmpty ? null : first;
-          }
+          // -------------- صفحه ۴ – گزارش تراکنش‌ها و رسید --------------
 
-          // ------------------ صفحه چهارم – گزارش تراکنش‌ها ------------------
-
-          enum TransactionFilter {
-            all,
-            offlineOnly,
-            pendingBank,
-            confirmed,
-            failed,
-          }
-
-          class TransactionHistoryPage extends StatefulWidget {
+          class TransactionHistoryPage extends StatelessWidget {
             const TransactionHistoryPage({super.key});
 
-            @override
-            State<TransactionHistoryPage> createState() =>
-                _TransactionHistoryPageState();
-          }
-
-          class _TransactionHistoryPageState
-              extends State<TransactionHistoryPage> {
-            TransactionFilter _filter = TransactionFilter.all;
-
-            List<TransactionRecord> get _filtered {
-              switch (_filter) {
-                case TransactionFilter.all:
-                  return List.unmodifiable(demoTransactions);
-                case TransactionFilter.offlineOnly:
-                  return demoTransactions
-                      .where((t) => t.status == TransactionStatus.offlineOnly)
-                      .toList();
-                case TransactionFilter.pendingBank:
-                  return demoTransactions
-                      .where((t) => t.status == TransactionStatus.pendingBank)
-                      .toList();
-                case TransactionFilter.confirmed:
-                  return demoTransactions
-                      .where((t) => t.status == TransactionStatus.confirmed)
-                      .toList();
-                case TransactionFilter.failed:
-                  return demoTransactions
-                      .where((t) => t.status == TransactionStatus.failed)
-                      .toList();
-              }
-            }
-
-            String _statusLabel(TransactionStatus s) {
-              switch (s) {
-                case TransactionStatus.offlineOnly:
-                  return 'ثبت‌شده فقط آفلاین';
-                case TransactionStatus.pendingBank:
-                  return 'در انتظار بانک';
-                case TransactionStatus.confirmed:
-                  return 'تأیید شده توسط بانک';
-                case TransactionStatus.failed:
-                  return 'ناموفق / رد شده';
-              }
-            }
-
-            Color _statusColor(TransactionStatus s) {
-              switch (s) {
-                case TransactionStatus.offlineOnly:
-                  return Colors.blueGrey;
-                case TransactionStatus.pendingBank:
-                  return Colors.orange;
-                case TransactionStatus.confirmed:
-                  return Colors.green;
-                case TransactionStatus.failed:
-                  return Colors.red;
-              }
-            }
-
-            IconData _methodIcon(PaymentMethod m) {
+            IconData _iconForMethod(PaymentMethod m) {
               switch (m) {
                 case PaymentMethod.bluetooth:
                   return Icons.bluetooth;
@@ -1211,7 +1087,7 @@ jobs:
               }
             }
 
-            String _methodLabel(PaymentMethod m) {
+            String _labelForMethod(PaymentMethod m) {
               switch (m) {
                 case PaymentMethod.bluetooth:
                   return 'بلوتوث';
@@ -1220,10 +1096,18 @@ jobs:
               }
             }
 
+            String _formatDateTime(DateTime dt) {
+              final y = dt.year.toString().padLeft(4, '0');
+              final m = dt.month.toString().padLeft(2, '0');
+              final d = dt.day.toString().padLeft(2, '0');
+              final hh = dt.hour.toString().padLeft(2, '0');
+              final mm = dt.minute.toString().padLeft(2, '0');
+              return '$y/$m/$d – $hh:$mm';
+            }
+
             @override
             Widget build(BuildContext context) {
-              final items = _filtered;
-
+              final items = demoTransactions.reversed.toList();
               return Directionality(
                 textDirection: TextDirection.rtl,
                 child: Scaffold(
@@ -1232,413 +1116,154 @@ jobs:
                   ),
                   body: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildFilterRow(),
-                        const SizedBox(height: 16),
-                        if (items.isEmpty)
-                          Expanded(
-                            child: Center(
-                              child: Text(
-                                'هنوز هیچ تراکنشی در دمو ثبت نشده است.',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade700,
-                                ),
+                    child: items.isEmpty
+                        ? Center(
+                            child: Text(
+                              'هنوز هیچ تراکنشی در دمو ثبت نشده است.',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade700,
                               ),
                             ),
                           )
-                        else
-                          Expanded(
-                            child: ListView.builder(
-                              itemCount: items.length,
-                              itemBuilder: (context, index) {
-                                final t = items[index];
-                                return _buildTransactionCard(t);
-                              },
-                            ),
-                          ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'تعداد کل تراکنش‌های دمو: ${demoTransactions.length}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
-
-            Widget _buildFilterRow() {
-              Widget chip(TransactionFilter f, String label) {
-                final selected = _filter == f;
-                return ChoiceChip(
-                  label: Text(label),
-                  selected: selected,
-                  onSelected: (_) {
-                    setState(() {
-                      _filter = f;
-                    });
-                  },
-                );
-              }
-
-              return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    chip(TransactionFilter.all, 'همه'),
-                    const SizedBox(width: 8),
-                    chip(TransactionFilter.confirmed, 'تأیید شده'),
-                    const SizedBox(width: 8),
-                    chip(TransactionFilter.pendingBank, 'در انتظار بانک'),
-                    const SizedBox(width: 8),
-                    chip(TransactionFilter.offlineOnly, 'فقط آفلاین'),
-                    const SizedBox(width: 8),
-                    chip(TransactionFilter.failed, 'ناموفق'),
-                  ],
-                ),
-              );
-            }
-
-            Widget _buildTransactionCard(TransactionRecord t) {
-              final color = _statusColor(t.status);
-              final statusLabel = _statusLabel(t.status);
-              final methodIcon = _methodIcon(t.method);
-              final methodLabel = _methodLabel(t.method);
-
-              return Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                margin: const EdgeInsets.only(bottom: 12),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => TransactionDetailPage(record: t),
-                      ),
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(methodIcon, size: 20, color: Colors.teal),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${t.amount} تومان',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const Spacer(),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: color.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              child: Text(
-                                statusLabel,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: color,
+                        : ListView.builder(
+                            itemCount: items.length,
+                            itemBuilder: (context, index) {
+                              final t = items[index];
+                              return Card(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          t.sellerName,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                                margin:
+                                    const EdgeInsets.only(bottom: 12),
+                                child: ListTile(
+                                  leading: Icon(
+                                    _iconForMethod(t.method),
+                                    color: Colors.teal,
+                                  ),
+                                  title: Text(
+                                    'پرداخت ${t.amount} تومان',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    'فروشنده: ${t.sellerName}\n'
+                                    'کیف پول: ${t.walletName}\n'
+                                    'روش: ${_labelForMethod(t.method)}\n'
+                                    'زمان: ${_formatDateTime(t.createdAt)}',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                  onTap: () {
+                                    showModalBottomSheet(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.vertical(
+                                          top: Radius.circular(20),
+                                        ),
+                                      ),
+                                      builder: (_) => _ReceiptSheet(
+                                        record: t,
+                                        labelForMethod: _labelForMethod,
+                                        formatDateTime: _formatDateTime,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.account_balance_wallet_outlined,
-                              size: 16,
-                              color: Colors.grey.shade600,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              t.walletName,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Icon(
-                              Icons.schedule,
-                              size: 16,
-                              color: Colors.grey.shade600,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _formatDateTime(t.createdAt),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.link,
-                              size: 16,
-                              color: Colors.grey.shade600,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'روش: $methodLabel',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
                   ),
                 ),
               );
-            }
-
-            String _formatDateTime(DateTime dt) {
-              // فرمت ساده برای دمو (میلادی، ولی در متن فارسی)
-              final y = dt.year.toString().padLeft(4, '0');
-              final m = dt.month.toString().padLeft(2, '0');
-              final d = dt.day.toString().padLeft(2, '0');
-              final hh = dt.hour.toString().padLeft(2, '0');
-              final mm = dt.minute.toString().padLeft(2, '0');
-              return '$y/$m/$d – $hh:$mm';
             }
           }
 
-          class TransactionDetailPage extends StatelessWidget {
+          class _ReceiptSheet extends StatelessWidget {
             final TransactionRecord record;
+            final String Function(PaymentMethod) labelForMethod;
+            final String Function(DateTime) formatDateTime;
 
-            const TransactionDetailPage({super.key, required this.record});
+            const _ReceiptSheet({
+              required this.record,
+              required this.labelForMethod,
+              required this.formatDateTime,
+            });
 
             @override
             Widget build(BuildContext context) {
-              final color = _statusColor(record.status);
-              final statusLabel = _statusLabel(record.status);
-              final methodLabel = _methodLabel(record.method);
-
               return Directionality(
                 textDirection: TextDirection.rtl,
-                child: Scaffold(
-                  appBar: AppBar(
-                    title: const Text('رسید تراکنش'),
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    top: 16,
+                    bottom: MediaQuery.of(context).viewInsets.bottom + 16,
                   ),
-                  body: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: double.infinity,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
                           decoration: BoxDecoration(
-                            color: color.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                statusLabel,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: color,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'مبلغ: ${record.amount} تومان',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'کیف پول: ${record.walletName}',
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'روش پرداخت: $methodLabel',
-                                style: const TextStyle(fontSize: 14),
-                              ),
-                            ],
+                            color: Colors.grey.shade400,
+                            borderRadius: BorderRadius.circular(999),
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        const Text(
-                          'اطلاعات فروشنده',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'رسید تراکنش',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          record.sellerName,
-                          style: const TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'مبلغ: ${record.amount} تومان',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
                         ),
-                        const SizedBox(height: 20),
-                        const Text(
-                          'زمان‌ها',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text('کیف پول: ${record.walletName}'),
+                      Text(
+                        'روش پرداخت: ${labelForMethod(record.method)}',
+                      ),
+                      Text('فروشنده: ${record.sellerName}'),
+                      const SizedBox(height: 8),
+                      Text(
+                        'زمان ثبت روی گوشی: ${formatDateTime(record.createdAt)}',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'کد تراکنش سوما: ${record.localId}',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      Text(
+                        'کد پیگیری بانک (دمو): ${record.bankRef}',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('بستن رسید'),
                         ),
-                        const SizedBox(height: 8),
-                        _infoRow(
-                          'ایجاد تراکنش روی گوشی',
-                          _formatDateTime(record.createdAt),
-                        ),
-                        if (record.sentToBankAt != null)
-                          _infoRow(
-                            'ارسال به بانک',
-                            _formatDateTime(record.sentToBankAt!),
-                          ),
-                        if (record.bankConfirmedAt != null)
-                          _infoRow(
-                            'تأیید / پاسخ بانک',
-                            _formatDateTime(record.bankConfirmedAt!),
-                          ),
-                        const SizedBox(height: 20),
-                        const Text(
-                          'کدها',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        _infoRow('کد تراکنش سوما', record.localId),
-                        _infoRow(
-                          'کد پیگیری بانک',
-                          record.bankReference ?? '—',
-                        ),
-                        const Spacer(),
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                            },
-                            child: const Text('بازگشت به لیست تراکنش‌ها'),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               );
-            }
-
-            static Widget _infoRow(String title, String value) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade800,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      flex: 3,
-                      child: Text(
-                        value,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            static String _formatDateTime(DateTime dt) {
-              final y = dt.year.toString().padLeft(4, '0');
-              final m = dt.month.toString().padLeft(2, '0');
-              final d = dt.day.toString().padLeft(2, '0');
-              final hh = dt.hour.toString().padLeft(2, '0');
-              final mm = dt.minute.toString().padLeft(2, '0');
-              return '$y/$m/$d – $hh:$mm';
-            }
-
-            static String _statusLabel(TransactionStatus s) {
-              switch (s) {
-                case TransactionStatus.offlineOnly:
-                  return 'ثبت‌شده فقط آفلاین';
-                case TransactionStatus.pendingBank:
-                  return 'در انتظار بانک';
-                case TransactionStatus.confirmed:
-                  return 'تأیید شده توسط بانک';
-                case TransactionStatus.failed:
-                  return 'ناموفق / رد شده';
-              }
-            }
-
-            static Color _statusColor(TransactionStatus s) {
-              switch (s) {
-                case TransactionStatus.offlineOnly:
-                  return Colors.blueGrey;
-                case TransactionStatus.pendingBank:
-                  return Colors.orange;
-                case TransactionStatus.confirmed:
-                  return Colors.green;
-                case TransactionStatus.failed:
-                  return Colors.red;
-              }
-            }
-
-            static String _methodLabel(PaymentMethod m) {
-              switch (m) {
-                case PaymentMethod.bluetooth:
-                  return 'بلوتوث';
-                case PaymentMethod.qr:
-                  return 'QR کد';
-              }
             }
           }
           DART
@@ -1652,4 +1277,3 @@ jobs:
         with:
           name: soma_demo_app-release.apk
           path: soma_demo/build/app/outputs/flutter-apk/app-release.apk
-```0
