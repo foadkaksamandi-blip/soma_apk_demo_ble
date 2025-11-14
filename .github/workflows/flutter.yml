@@ -1,4 +1,4 @@
-name: Soma Demo APK
+name: Soma Buyer Demo APK
 
 on:
   push:
@@ -26,15 +26,15 @@ jobs:
       - name: Create app & deps
         run: |
           flutter --version
-          rm -rf soma_demo || true
-          flutter create --platforms=android soma_demo
-          cd soma_demo
+          rm -rf soma_buyer || true
+          flutter create --platforms=android soma_buyer
+          cd soma_buyer
           flutter pub add flutter_blue_plus
           flutter pub add mobile_scanner
           flutter pub add qr_flutter
 
-      - name: Write main.dart
-        working-directory: soma_demo
+      - name: Write main.dart (Buyer)
+        working-directory: soma_buyer
         shell: bash
         run: |
           mkdir -p lib
@@ -44,62 +44,86 @@ jobs:
           import 'package:mobile_scanner/mobile_scanner.dart';
           import 'package:qr_flutter/qr_flutter.dart';
 
-          void main() => runApp(const SomaDemo());
+          void main() => runApp(const SomaBuyerApp());
 
-          class SomaDemo extends StatelessWidget {
-            const SomaDemo({super.key});
+          class SomaBuyerApp extends StatelessWidget {
+            const SomaBuyerApp({super.key});
+
             @override
             Widget build(BuildContext context) {
               return MaterialApp(
-                title: 'SOMA Offline Demo',
-                theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
-                home: const HomePage(),
+                title: 'SOMA Buyer Demo',
+                theme: ThemeData(
+                  colorSchemeSeed: Colors.teal,
+                  useMaterial3: true,
+                ),
+                home: const BuyerHomePage(),
               );
             }
           }
 
-          class HomePage extends StatefulWidget {
-            const HomePage({super.key});
+          class BuyerHomePage extends StatefulWidget {
+            const BuyerHomePage({super.key});
+
             @override
-            State<HomePage> createState() => _HomePageState();
+            State<BuyerHomePage> createState() => _BuyerHomePageState();
           }
 
-          class _HomePageState extends State<HomePage> {
-            String log = 'Ready';
+          class _BuyerHomePageState extends State<BuyerHomePage> {
+            String log = 'آماده برای پرداخت';
+
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('SOMA Demo')),
+                appBar: AppBar(
+                  title: const Text('اپ خریدار سوما'),
+                ),
                 body: Padding(
                   padding: const EdgeInsets.all(16),
                   child: ListView(
                     children: [
                       FilledButton(
                         onPressed: () async {
-                          setState(() => log = 'Scanning BLE…');
-                          await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
-                          final results = await FlutterBluePlus.scanResults.first;
-                          setState(() => log = 'Found ${results.length} devices');
+                          setState(() => log = 'در حال اسکن بلوتوث…');
+                          await FlutterBluePlus.startScan(
+                            timeout: const Duration(seconds: 5),
+                          );
+                          final results =
+                              await FlutterBluePlus.scanResults.first;
+                          setState(
+                            () => log =
+                                'تعداد دستگاه‌های پیدا شده: ${results.length}',
+                          );
                           FlutterBluePlus.stopScan();
                         },
-                        child: const Text('Scan Bluetooth'),
+                        child: const Text('پرداخت با بلوتوث'),
                       ),
                       const SizedBox(height: 12),
                       FilledButton.tonal(
                         onPressed: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const QrShowPage()));
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const QrShowPage(),
+                            ),
+                          );
                         },
-                        child: const Text('Show My QR'),
+                        child: const Text('نمایش QR کیف پول من'),
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton(
                         onPressed: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (_) => const QrScanPage()));
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const QrScanPage(),
+                            ),
+                          );
                         },
-                        child: const Text('Scan QR'),
+                        child: const Text('پرداخت با اسکن QR'),
                       ),
                       const SizedBox(height: 24),
-                      Text('Log: $log'),
+                      Text('وضعیت: $log'),
                     ],
                   ),
                 ),
@@ -109,13 +133,14 @@ jobs:
 
           class QrShowPage extends StatelessWidget {
             const QrShowPage({super.key});
+
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('My QR')),
+                appBar: AppBar(title: const Text('QR خریدار')),
                 body: Center(
                   child: QrImageView(
-                    data: 'SOMA-DEMO-12345',
+                    data: 'SOMA-BUYER-DEMO-12345',
                     size: 220,
                   ),
                 ),
@@ -125,14 +150,17 @@ jobs:
 
           class QrScanPage extends StatelessWidget {
             const QrScanPage({super.key});
+
             @override
             Widget build(BuildContext context) {
               return Scaffold(
-                appBar: AppBar(title: const Text('Scan QR')),
+                appBar: AppBar(title: const Text('اسکن QR فروشنده')),
                 body: MobileScanner(
                   onDetect: (capture) {
-                    final barcode = capture.barcodes.isNotEmpty ? capture.barcodes.first.rawValue : null;
-                    debugPrint('QR: $barcode');
+                    final barcode = capture.barcodes.isNotEmpty
+                        ? capture.barcodes.first.rawValue
+                        : null;
+                    debugPrint('QR فروشنده: $barcode');
                   },
                 ),
               );
@@ -141,11 +169,11 @@ jobs:
           DART
 
       - name: Build release APK
-        working-directory: soma_demo
+        working-directory: soma_buyer
         run: flutter build apk --release --no-shrink
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: soma_demo_app-release.apk
-          path: soma_demo/build/app/outputs/flutter-apk/app-release.apk
+          name: soma_buyer_app-release.apk
+          path: soma_buyer/build/app/outputs/flutter-apk/app-release.apk
