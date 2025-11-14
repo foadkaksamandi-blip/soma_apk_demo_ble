@@ -1,4 +1,4 @@
-name: Soma Buyer Demo APK
+name: Soma Demo APK
 
 on:
   push:
@@ -26,23 +26,20 @@ jobs:
       - name: Create app & deps
         run: |
           flutter --version
-          rm -rf soma_buyer || true
-          flutter create --platforms=android soma_buyer
-          cd soma_buyer
+          rm -rf soma_demo || true
+          flutter create --platforms=android soma_demo
+          cd soma_demo
           flutter pub add flutter_blue_plus
           flutter pub add mobile_scanner
           flutter pub add qr_flutter
 
-      - name: Write main.dart (Buyer)
-        working-directory: soma_buyer
+      - name: Write main.dart (Buyer App - Page 1)
+        working-directory: soma_demo
         shell: bash
         run: |
           mkdir -p lib
           cat > lib/main.dart <<'DART'
           import 'package:flutter/material.dart';
-          import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-          import 'package:mobile_scanner/mobile_scanner.dart';
-          import 'package:qr_flutter/qr_flutter.dart';
 
           void main() => runApp(const SomaBuyerApp());
 
@@ -52,14 +49,25 @@ jobs:
             @override
             Widget build(BuildContext context) {
               return MaterialApp(
-                title: 'SOMA Buyer Demo',
+                debugShowCheckedModeBanner: false,
+                title: 'اپ آفلاین سوما',
                 theme: ThemeData(
                   colorSchemeSeed: Colors.teal,
                   useMaterial3: true,
+                  fontFamily: 'Roboto',
                 ),
                 home: const BuyerHomePage(),
               );
             }
+          }
+
+          enum PaymentMethod { bluetooth, qr }
+
+          enum WalletType {
+            main,
+            subsidy,
+            emergency,
+            nationalCrypto,
           }
 
           class BuyerHomePage extends StatefulWidget {
@@ -70,110 +78,305 @@ jobs:
           }
 
           class _BuyerHomePageState extends State<BuyerHomePage> {
-            String log = 'آماده برای پرداخت';
+            PaymentMethod _method = PaymentMethod.bluetooth;
+            WalletType _wallet = WalletType.main;
+
+            // موجودی‌ها (فعلاً عدد ثابت برای دمو)
+            int mainBalance = 1200000;
+            int subsidyBalance = 400000;
+            int emergencyBalance = 250000;
+            int nationalCryptoBalance = 0;
+
+            final TextEditingController _amountController =
+                TextEditingController();
+            final TextEditingController _txCodeController =
+                TextEditingController();
+
+            String status = 'وضعیت: آماده';
+
+            String _walletLabel(WalletType w) {
+              switch (w) {
+                case WalletType.main:
+                  return 'موجودی اصلی';
+                case WalletType.subsidy:
+                  return 'موجودی یارانه‌ای';
+                case WalletType.emergency:
+                  return 'موجودی اضطراری ملی';
+                case WalletType.nationalCrypto:
+                  return 'موجودی رمز ارز ملی';
+              }
+            }
+
+            int _walletBalance(WalletType w) {
+              switch (w) {
+                case WalletType.main:
+                  return mainBalance;
+                case WalletType.subsidy:
+                  return subsidyBalance;
+                case WalletType.emergency:
+                  return emergencyBalance;
+                case WalletType.nationalCrypto:
+                  return nationalCryptoBalance;
+              }
+            }
+
+            @override
+            void dispose() {
+              _amountController.dispose();
+              _txCodeController.dispose();
+              super.dispose();
+            }
 
             @override
             Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(
-                  title: const Text('اپ خریدار سوما'),
-                ),
-                body: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: ListView(
-                    children: [
-                      FilledButton(
-                        onPressed: () async {
-                          setState(() => log = 'در حال اسکن بلوتوث…');
-                          await FlutterBluePlus.startScan(
-                            timeout: const Duration(seconds: 5),
-                          );
-                          final results =
-                              await FlutterBluePlus.scanResults.first;
-                          setState(
-                            () => log =
-                                'تعداد دستگاه‌های پیدا شده: ${results.length}',
-                          );
-                          FlutterBluePlus.stopScan();
-                        },
-                        child: const Text('پرداخت با بلوتوث'),
-                      ),
-                      const SizedBox(height: 12),
-                      FilledButton.tonal(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const QrShowPage(),
-                            ),
-                          );
-                        },
-                        child: const Text('نمایش QR کیف پول من'),
-                      ),
-                      const SizedBox(height: 12),
-                      OutlinedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const QrScanPage(),
-                            ),
-                          );
-                        },
-                        child: const Text('پرداخت با اسکن QR'),
-                      ),
-                      const SizedBox(height: 24),
-                      Text('وضعیت: $log'),
-                    ],
+              return Directionality(
+                textDirection: TextDirection.rtl,
+                child: Scaffold(
+                  appBar: AppBar(
+                    title: const Text('اپ آفلاین سوما'),
+                    centerTitle: true,
+                  ),
+                  body: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: ListView(
+                      children: [
+                        const Text(
+                          'اپ خریدار',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // موجودی اصلی
+                        _buildBalanceCard(),
+
+                        const SizedBox(height: 24),
+
+                        // انتخاب نحوه پرداخت
+                        const Text(
+                          'انتخاب نحوه پرداخت',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildPaymentMethodButtons(),
+
+                        const SizedBox(height: 24),
+
+                        // انتخاب کیف پول برای پرداخت
+                        const Text(
+                          'انتخاب کیف پول برای پرداخت',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildWalletSelector(),
+
+                        const SizedBox(height: 24),
+
+                        // مبلغ پرداخت
+                        const Text(
+                          'مبلغ پرداخت (تومان)',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _amountController,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            hintText: 'مثلاً ۲۵۰۰۰',
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        // کد تراکنش
+                        const Text(
+                          'کد تراکنش',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _txCodeController,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            hintText: 'کد/شناسه تراکنش (اختیاری در دمو)',
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // دکمه اصلی شروع پرداخت
+                        FilledButton(
+                          onPressed: _onStartPayment,
+                          child: const Text('تأیید و شروع پرداخت'),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // وضعیت
+                        Text(
+                          status,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
             }
-          }
 
-          class QrShowPage extends StatelessWidget {
-            const QrShowPage({super.key});
-
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('QR خریدار')),
-                body: Center(
-                  child: QrImageView(
-                    data: 'SOMA-BUYER-DEMO-12345',
-                    size: 220,
-                  ),
+            Widget _buildBalanceCard() {
+              final int balance = mainBalance;
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.teal.withOpacity(0.06),
+                  border: Border.all(color: Colors.teal.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'موجودی اصلی',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${balance.toString()} تومان',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               );
             }
-          }
 
-          class QrScanPage extends StatelessWidget {
-            const QrScanPage({super.key});
+            Widget _buildPaymentMethodButtons() {
+              return Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        setState(() {
+                          _method = PaymentMethod.bluetooth;
+                          status = 'وضعیت: پرداخت با بلوتوث انتخاب شد';
+                        });
+                      },
+                      child: const Text('پرداخت با بلوتوث'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonal(
+                      onPressed: () {
+                        setState(() {
+                          _method = PaymentMethod.qr;
+                          status = 'وضعیت: پرداخت با QR مد انتخاب شد';
+                        });
+                      },
+                      child: const Text('پرداخت با QR مد'),
+                    ),
+                  ),
+                ],
+              );
+            }
 
-            @override
-            Widget build(BuildContext context) {
-              return Scaffold(
-                appBar: AppBar(title: const Text('اسکن QR فروشنده')),
-                body: MobileScanner(
-                  onDetect: (capture) {
-                    final barcode = capture.barcodes.isNotEmpty
-                        ? capture.barcodes.first.rawValue
-                        : null;
-                    debugPrint('QR فروشنده: $barcode');
+            Widget _buildWalletSelector() {
+              return Column(
+                children: [
+                  _walletTile(WalletType.main),
+                  _walletTile(WalletType.subsidy),
+                  _walletTile(WalletType.emergency),
+                  _walletTile(WalletType.nationalCrypto),
+                ],
+              );
+            }
+
+            Widget _walletTile(WalletType type) {
+              final bool selected = _wallet == type;
+              return Card(
+                elevation: selected ? 2 : 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(
+                    color: selected
+                        ? Colors.teal
+                        : Colors.grey.withOpacity(0.3),
+                  ),
+                ),
+                child: RadioListTile<WalletType>(
+                  value: type,
+                  groupValue: _wallet,
+                  onChanged: (val) {
+                    if (val == null) return;
+                    setState(() {
+                      _wallet = val;
+                      status =
+                          'وضعیت: ${_walletLabel(val)} برای پرداخت انتخاب شد';
+                    });
                   },
+                  title: Text(_walletLabel(type)),
+                  subtitle: Text(
+                    'موجودی: ${_walletBalance(type)} تومان',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                 ),
               );
+            }
+
+            void _onStartPayment() {
+              final String amount = _amountController.text.trim();
+              if (amount.isEmpty) {
+                setState(() {
+                  status = 'وضعیت: لطفاً مبلغ پرداخت را وارد کنید';
+                });
+                return;
+              }
+
+              final String txCode = _txCodeController.text.trim();
+              final String methodText =
+                  _method == PaymentMethod.bluetooth
+                      ? 'بلوتوث'
+                      : 'QR مد';
+              final String walletText = _walletLabel(_wallet);
+
+              setState(() {
+                status =
+                    'وضعیت: شروع پرداخت $amount تومان از $walletText با $methodText'
+                    '${txCode.isNotEmpty ? ' (کد: $txCode)' : ''}';
+              });
+
+              // در این نسخه فقط پیام وضعیت را عوض می‌کنیم.
+              // در مراحل بعدی به این تابع، منطق واقعی بلوتوث/QR را اضافه می‌کنیم.
             }
           }
           DART
 
       - name: Build release APK
-        working-directory: soma_buyer
+        working-directory: soma_demo
         run: flutter build apk --release --no-shrink
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: soma_buyer_app-release.apk
-          path: soma_buyer/build/app/outputs/flutter-apk/app-release.apk
+          name: soma_demo_app-release.apk
+          path: soma_demo/build/app/outputs/flutter-apk/app-release.apk
