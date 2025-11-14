@@ -30,6 +30,8 @@ jobs:
           flutter create --platforms=android soma_demo
           cd soma_demo
           flutter pub add flutter_blue_plus
+          flutter pub add mobile_scanner
+          flutter pub add qr_flutter
 
       - name: Write main.dart
         working-directory: soma_demo
@@ -39,6 +41,8 @@ jobs:
           cat > lib/main.dart <<'DART'
           import 'package:flutter/material.dart';
           import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+          import 'package:mobile_scanner/mobile_scanner.dart';
+          import 'package:qr_flutter/qr_flutter.dart';
 
           void main() {
             runApp(const SomaOfflineBuyerApp());
@@ -130,7 +134,7 @@ jobs:
               );
             }
 
-            void _goToQrDemo() {
+            void _goToQrPayment() {
               final amount = _parseAmount();
               if (amount == null || amount <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -142,9 +146,10 @@ jobs:
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => QrPaymentDemoPage(
+                  builder: (_) => QrPaymentPage(
                     amount: amount,
                     walletName: walletName,
+                    txCode: _txCodeController.text.trim(),
                   ),
                 ),
               );
@@ -189,7 +194,7 @@ jobs:
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.tonal(
-                            onPressed: _goToQrDemo,
+                            onPressed: _goToQrPayment,
                             child: const Text('پرداخت با QR کد'),
                           ),
                         ),
@@ -398,7 +403,7 @@ jobs:
                 case ConnectionStatus.connecting:
                   return 'اپ فروشنده انتخاب شد. در حال برقراری اتصال امن…';
                 case ConnectionStatus.connected:
-                  return 'اتصال امن برقرار شد. می‌توانید پرداخت را انجام دهید.';
+                  return 'اتصال امن برقرار شد. می‌توانید پرداخت را ارسال کنید.';
                 case ConnectionStatus.error:
                   return 'خطا در اتصال. لطفاً دوباره تلاش کنید.';
               }
@@ -464,8 +469,10 @@ jobs:
               if (!_canConfirm) return;
 
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('پرداخت با موفقیت انجام شد.'),
+                SnackBar(
+                  content: Text(
+                    'پرداخت با موفقیت انجام شد.',
+                  ),
                 ),
               );
 
@@ -537,6 +544,11 @@ jobs:
                           ),
                         ),
                         const SizedBox(height: 20),
+                        const Text(
+                          'اپ فروشنده',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
                         _buildSellerBox(),
                         const SizedBox(height: 20),
                         const Text(
@@ -656,40 +668,118 @@ jobs:
             }
           }
 
-          /// صفحه دمو برای پرداخت با QR (فعلاً ساده)
-          class QrPaymentDemoPage extends StatelessWidget {
+          /// صفحه سوم – پرداخت با QR کد
+          enum QrMode {
+            none,
+            showMyQr,
+            scanSeller,
+          }
+
+          class QrPaymentPage extends StatefulWidget {
             final int amount;
             final String walletName;
+            final String txCode;
 
-            const QrPaymentDemoPage({
+            const QrPaymentPage({
               super.key,
               required this.amount,
               required this.walletName,
+              required this.txCode,
             });
 
             @override
-            Widget build(BuildContext context) {
-              final amountText = '$amount تومان';
+            State<QrPaymentPage> createState() => _QrPaymentPageState();
+          }
 
+          class _QrPaymentPageState extends State<QrPaymentPage> {
+            QrMode _mode = QrMode.none;
+            String _statusText = 'در انتظار انتخاب حالت QR…';
+            bool _qrValid = false;
+            String? _scannedData;
+
+            final MobileScannerController _scannerController = MobileScannerController();
+
+            String get _amountText => '${widget.amount} تومان';
+
+            String get _qrPayload {
+              final base = 'SOMA|AMOUNT=${widget.amount}|WALLET=${widget.walletName}';
+              if (widget.txCode.isEmpty) return base;
+              return '$base|TX=${widget.txCode}';
+            }
+
+            bool get _canConfirm => _qrValid;
+
+            void _setMode(QrMode mode) {
+              setState(() {
+                _mode = mode;
+                _qrValid = mode == QrMode.showMyQr;
+                _scannedData = null;
+                if (mode == QrMode.showMyQr) {
+                  _statusText = 'QR برای نمایش به فروشنده آماده است.';
+                } else if (mode == QrMode.scanSeller) {
+                  _statusText = 'در حال اسکن QR فروشنده…';
+                } else {
+                  _statusText = 'در انتظار انتخاب حالت QR…';
+                }
+              });
+            }
+
+            void _onDetect(BarcodeCapture capture) {
+              final barcode = capture.barcodes.isNotEmpty ? capture.barcodes.first.rawValue : null;
+              if (barcode == null) return;
+
+              setState(() {
+                _scannedData = barcode;
+                _qrValid = true;
+                _statusText = 'QR معتبر دریافت شد. می‌توانید پرداخت را ارسال کنید.';
+              });
+            }
+
+            void _confirmAndSend() {
+              if (!_canConfirm) return;
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('پرداخت با موفقیت انجام شد.'),
+                ),
+              );
+
+              Navigator.pop(context);
+            }
+
+            @override
+            void dispose() {
+              _scannerController.dispose();
+              super.dispose();
+            }
+
+            @override
+            Widget build(BuildContext context) {
               return Directionality(
                 textDirection: TextDirection.rtl,
                 child: Scaffold(
                   appBar: AppBar(
                     title: const Text('اپ آفلاین سوما'),
                   ),
-                  body: Padding(
+                  body: SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'اپ خریدار',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'اپ خریدار',
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                          ),
                         ),
                         const SizedBox(height: 16),
-                        const Text(
-                          'پرداخت با QR کد (دمو)',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'پرداخت با QR کد',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Container(
@@ -703,12 +793,12 @@ jobs:
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'مبلغ خرید: $amountText',
+                                'مبلغ خرید: $_amountText',
                                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'کیف پول انتخاب‌شده: $walletName',
+                                'کیف پول انتخاب‌شده: ${widget.walletName}',
                                 style: const TextStyle(fontSize: 14),
                               ),
                             ],
@@ -716,12 +806,148 @@ jobs:
                         ),
                         const SizedBox(height: 24),
                         const Text(
-                          'در نسخه نهایی، در این صفحه QR پرداخت خریدار نمایش و اسکن می‌شود.\n'
-                          'فعلاً این صفحه فقط برای تست ساخت APK است.',
-                          style: TextStyle(fontSize: 14),
+                          'انتخاب حالت QR',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'می‌توانید QR خود را به فروشنده نشان دهید یا QR فروشنده را اسکن کنید.',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: () => _setMode(QrMode.showMyQr),
+                            child: const Text('نمایش QR من برای فروشنده'),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.tonal(
+                            onPressed: () => _setMode(QrMode.scanSeller),
+                            child: const Text('اسکن QR فروشنده'),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _buildQrContent(),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'وضعیت پرداخت',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey.shade300),
+                          ),
+                          padding: const EdgeInsets.all(12),
+                          child: Text(
+                            _statusText,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        if (_scannedData != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            'داده QR فروشنده: $_scannedData',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: _canConfirm ? _confirmAndSend : null,
+                            child: const Text('تأیید و ارسال پرداخت'),
+                          ),
                         ),
                       ],
                     ),
+                  ),
+                ),
+              );
+            }
+
+            Widget _buildQrContent() {
+              if (_mode == QrMode.none) {
+                return Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: const Text(
+                    'لطفاً یکی از حالت‌های QR را انتخاب کنید.',
+                    style: TextStyle(fontSize: 14),
+                  ),
+                );
+              }
+
+              if (_mode == QrMode.showMyQr) {
+                return Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      QrImageView(
+                        data: _qrPayload,
+                        size: 220,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'این کد را فروشنده اسکن کند.',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              // حالت اسکن QR فروشنده
+              return Container(
+                width: double.infinity,
+                height: 260,
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Stack(
+                    children: [
+                      MobileScanner(
+                        controller: _scannerController,
+                        onDetect: _onDetect,
+                      ),
+                      Align(
+                        alignment: Alignment.topCenter,
+                        child: Container(
+                          margin: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'دوربین را روی QR فروشنده نگه دارید',
+                            style: TextStyle(color: Colors.white, fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );
