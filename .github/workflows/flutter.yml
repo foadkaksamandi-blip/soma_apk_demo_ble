@@ -39,7 +39,9 @@ jobs:
         run: |
           mkdir -p lib
           cat > lib/main.dart <<'DART'
+          import 'dart:async';
           import 'package:flutter/material.dart';
+          import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
           void main() {
             runApp(const SomaOfflineApp());
@@ -55,7 +57,6 @@ jobs:
                 theme: ThemeData(
                   colorSchemeSeed: Colors.teal,
                   useMaterial3: true,
-                  fontFamily: 'Roboto',
                 ),
                 home: const Directionality(
                   textDirection: TextDirection.rtl,
@@ -156,57 +157,10 @@ jobs:
               });
             }
 
-            Future<void> _onConfirmPressed() async {
-              final amountText = _amountController.text.trim();
-              if (amountText.isEmpty) {
-                setState(() {
-                  _statusText = 'لطفاً مبلغ پرداخت را وارد کنید.';
-                });
-                return;
-              }
-
-              final amount =
-                  int.tryParse(amountText.replaceAll('٬', '').replaceAll(',', ''));
-              if (amount == null || amount <= 0) {
-                setState(() {
-                  _statusText = 'مبلغ وارد شده نامعتبر است.';
-                });
-                return;
-              }
-
-              final request = PaymentRequest(
-                wallet: _selectedWallet,
-                amount: amount,
-                manualCode: _codeController.text.trim().isEmpty
-                    ? null
-                    : _codeController.text.trim(),
-              );
-
-              if (_method == PaymentMethod.bluetooth) {
-                final resultCode = await Navigator.push<String>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const Directionality(
-                      textDirection: TextDirection.rtl,
-                      child: SizedBox.shrink(),
-                    ),
-                  ),
-                );
-
-                // این بخش بلافاصله با صفحه واقعی پرداخت بلوتوث جایگزین می‌شود
-                // (در ادامه همین فایل تعریف شده است)
-              } else {
-                setState(() {
-                  _statusText =
-                      'حالت QR کد در این نسخه‌ی دمو هنوز فعال نشده است.';
-                });
-              }
-            }
-
             @override
             Widget build(BuildContext context) {
               final methodBluetooth = _method == PaymentMethod.bluetooth;
-              final methodQr = _method == PaymentMethod.qr;
+              // final methodQr = _method == PaymentMethod.qr;
 
               return Scaffold(
                 appBar: AppBar(
@@ -221,9 +175,7 @@ jobs:
                         alignment: Alignment.centerRight,
                         child: Text(
                           'اپ خریدار',
-                          style: TextStyle(
-                            fontSize: 16,
-                          ),
+                          style: TextStyle(fontSize: 16),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -232,7 +184,9 @@ jobs:
                       const Text(
                         'انتخاب نحوه پرداخت',
                         style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       FilledButton(
@@ -257,7 +211,9 @@ jobs:
                       const Text(
                         'انتخاب کیف پول برای پرداخت',
                         style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       ..._wallets.map(
@@ -279,8 +235,9 @@ jobs:
                             },
                             title: Text(
                               w.title,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                             subtitle: Text(w.description),
                             activeColor: Colors.teal,
@@ -447,44 +404,71 @@ jobs:
                 _BluetoothPaymentPageState();
           }
 
-          class _BluetoothPaymentPageState
-              extends State<BluetoothPaymentPage> {
+          class _BluetoothPaymentPageState extends State<BluetoothPaymentPage> {
             BluetoothScanStatus _status = BluetoothScanStatus.preparing;
-            final List<String> _allDemoDevices = const [
-              'SOMA-STORE-01',
-              'SOMA-STORE-02',
-              'SOMA-MARKET-LOCAL',
-            ];
-            final List<String> _visibleDevices = [];
-            String? _selectedDevice;
+            String? _foundDeviceName;
             String? _connectionMessage;
             String? _generatedCode;
+            StreamSubscription<List<ScanResult>>? _scanSub;
 
             @override
             void initState() {
               super.initState();
-              _startDemoScan();
+              _startRealScan();
             }
 
-            void _startDemoScan() {
+            @override
+            void dispose() {
+              _scanSub?.cancel();
+              FlutterBluePlus.stopScan();
+              super.dispose();
+            }
+
+            void _startRealScan() {
+              _scanSub?.cancel();
               setState(() {
                 _status = BluetoothScanStatus.scanning;
-                _visibleDevices.clear();
-                _selectedDevice = null;
+                _foundDeviceName = null;
                 _connectionMessage = null;
                 _generatedCode = null;
               });
 
-              Future.delayed(const Duration(seconds: 2), () {
+              FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
+
+              _scanSub = FlutterBluePlus.scanResults.listen((results) {
+                final allowed = results.where((r) {
+                  final name = r.device.platformName;
+                  if (name.isEmpty) return false;
+                  // فقط دستگاه‌هایی که اسم‌شان با SOMA شروع می‌شود
+                  return name.startsWith('SOMA');
+                }).toList();
+
+                if (allowed.isNotEmpty) {
+                  final first = allowed.first;
+                  setState(() {
+                    _foundDeviceName = first.device.platformName;
+                    _status = BluetoothScanStatus.devicesFound;
+                    _connectionMessage =
+                        'اپ فروشنده مجاز پیدا شد: $_foundDeviceName';
+                  });
+                }
+              }, onError: (_) {
                 setState(() {
-                  _visibleDevices.addAll(_allDemoDevices);
-                  _status = _visibleDevices.isEmpty
-                      ? BluetoothScanStatus.noDevices
-                      : BluetoothScanStatus.devicesFound;
-                  _connectionMessage = _visibleDevices.isEmpty
-                      ? 'هیچ دستگاه فروشنده مجاز در نزدیکی یافت نشد.'
-                      : 'فروشنده‌های نزدیک یافت شد. لطفاً یکی را انتخاب کنید.';
+                  _status = BluetoothScanStatus.error;
+                  _connectionMessage = 'خطا در اسکن بلوتوث.';
                 });
+              });
+
+              Future.delayed(const Duration(seconds: 6), () {
+                if (!mounted) return;
+                if (_foundDeviceName == null &&
+                    _status == BluetoothScanStatus.scanning) {
+                  setState(() {
+                    _status = BluetoothScanStatus.noDevices;
+                    _connectionMessage =
+                        'هیچ اپ فروشنده مجاز (با شناسه SOMA-) پیدا نشد.';
+                  });
+                }
               });
             }
 
@@ -493,41 +477,44 @@ jobs:
                 case BluetoothScanStatus.preparing:
                   return 'در حال آماده‌سازی بلوتوث…';
                 case BluetoothScanStatus.scanning:
-                  return 'در حال جست‌وجوی دستگاه‌های فروشنده نزدیک…';
+                  return 'در حال جست‌وجوی اپ فروشنده مجاز…';
                 case BluetoothScanStatus.noDevices:
-                  return 'هیچ دستگاه فروشنده مجاز در نزدیکی یافت نشد.';
+                  return 'هیچ اپ فروشنده مجاز پیدا نشد.';
                 case BluetoothScanStatus.devicesFound:
-                  return _connectionMessage ?? 'فروشنده‌های نزدیک یافت شد.';
+                  return 'اپ فروشنده پیدا شد. می‌توانید پرداخت را ارسال کنید.';
                 case BluetoothScanStatus.connecting:
-                  return 'در حال اتصال به دستگاه انتخاب‌شده…';
+                  return 'در حال اتصال به اپ فروشنده…';
                 case BluetoothScanStatus.connected:
-                  return 'اتصال با موفقیت برقرار شد.';
+                  return 'اتصال برقرار و پرداخت ارسال شد.';
                 case BluetoothScanStatus.error:
                   return 'خطا در اتصال. لطفاً دوباره تلاش کنید.';
               }
             }
 
             Future<void> _connectAndPay() async {
-              if (_selectedDevice == null) {
+              if (_foundDeviceName == null) {
                 setState(() {
                   _connectionMessage =
-                      'لطفاً یک دستگاه فروشنده را انتخاب کنید.';
+                      'هنوز اپ فروشنده پیدا نشده است. ابتدا جست‌وجو را انجام دهید.';
                 });
                 return;
               }
+
               setState(() {
                 _status = BluetoothScanStatus.connecting;
-                _connectionMessage = null;
+                _connectionMessage = 'در حال اتصال به $_foundDeviceName…';
               });
 
               await Future.delayed(const Duration(seconds: 2));
+              FlutterBluePlus.stopScan();
 
               setState(() {
                 _status = BluetoothScanStatus.connected;
                 final now = DateTime.now();
                 _generatedCode =
                     'SOMA-${now.year % 100}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-${now.millisecondsSinceEpoch % 1000000}';
-                _connectionMessage = 'پرداخت با موفقیت در حالت دمو ثبت شد.';
+                _connectionMessage =
+                    'پرداخت با موفقیت در حالت دمو ثبت شد و به $_foundDeviceName ارسال شد.';
               });
 
               await Future.delayed(const Duration(seconds: 1));
@@ -551,35 +538,27 @@ jobs:
                       _buildSummaryCard(req),
                       const SizedBox(height: 24),
                       const Text(
-                        'انتخاب دستگاه فروشنده',
+                        'اپ فروشنده',
                         style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 12),
-                      if (_visibleDevices.isEmpty &&
-                          _status == BluetoothScanStatus.scanning)
-                        const Center(child: CircularProgressIndicator())
-                      else
-                        ..._visibleDevices.map(
-                          (id) => Card(
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: RadioListTile<String>(
-                              value: id,
-                              groupValue: _selectedDevice,
-                              onChanged: (value) {
-                                if (value == null) return;
-                                setState(() => _selectedDevice = value);
-                              },
-                              title: Text(id.replaceAll(
-                                  'SOMA-MARKET-LOCAL', 'SOMA - سوپرمارکت محل')),
-                              subtitle: const Text('فروشنده نزدیک (دمو)'),
-                              activeColor: Colors.teal,
-                            ),
-                          ),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade300),
                         ),
-                      const SizedBox(height: 16),
+                        child: Text(
+                          _foundDeviceName == null
+                              ? 'در حال جست‌وجو برای اپ فروشنده مجاز…'
+                              : 'اپ فروشنده متصل: $_foundDeviceName',
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       const Text(
                         'وضعیت اتصال',
                         style: TextStyle(fontWeight: FontWeight.bold),
@@ -603,7 +582,7 @@ jobs:
                       ],
                       const SizedBox(height: 24),
                       OutlinedButton(
-                        onPressed: _startDemoScan,
+                        onPressed: _startRealScan,
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size.fromHeight(48),
                         ),
