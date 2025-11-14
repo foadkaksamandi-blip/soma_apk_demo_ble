@@ -1,4 +1,4 @@
-name: Soma Demo APK
+name: Soma Buyer App
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,11 +34,10 @@ jobs:
           flutter pub add mobile_scanner
           flutter pub add qr_flutter
 
-      - name: Write main.dart (Buyer App - Page 1)
+      - name: Write main.dart (Buyer App – Page 1)
         working-directory: soma_demo
         shell: bash
         run: |
-          mkdir -p lib
           cat > lib/main.dart <<'DART'
           import 'package:flutter/material.dart';
 
@@ -54,20 +54,20 @@ jobs:
                 theme: ThemeData(
                   colorSchemeSeed: Colors.teal,
                   useMaterial3: true,
-                  fontFamily: 'Roboto',
                 ),
-                home: const BuyerHomePage(),
+                home: const Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: BuyerHomePage(),
+                ),
               );
             }
           }
-
-          enum PaymentMethod { bluetooth, qr }
 
           enum WalletType {
             main,
             subsidy,
             emergency,
-            nationalCrypto,
+            digitalRial,
           }
 
           class BuyerHomePage extends StatefulWidget {
@@ -78,295 +78,337 @@ jobs:
           }
 
           class _BuyerHomePageState extends State<BuyerHomePage> {
-            PaymentMethod _method = PaymentMethod.bluetooth;
-            WalletType _wallet = WalletType.main;
-
-            // موجودی‌ها (فعلاً عدد ثابت برای دمو)
-            int mainBalance = 1200000;
-            int subsidyBalance = 400000;
-            int emergencyBalance = 250000;
-            int nationalCryptoBalance = 0;
+            WalletType _selectedWallet = WalletType.main;
 
             final TextEditingController _amountController =
                 TextEditingController();
-            final TextEditingController _txCodeController =
+            final TextEditingController _traceController =
                 TextEditingController();
 
-            String status = 'وضعیت: آماده';
+            String _status =
+                'وضعیت: موجودی اصلی برای پرداخت انتخاب شده است';
 
-            String _walletLabel(WalletType w) {
-              switch (w) {
+            @override
+            void dispose() {
+              _amountController.dispose();
+              _traceController.dispose();
+              super.dispose();
+            }
+
+            void _selectWallet(WalletType wallet) {
+              setState(() {
+                _selectedWallet = wallet;
+                _status =
+                    'وضعیت: ${_walletTitle(wallet)} برای پرداخت انتخاب شد';
+              });
+            }
+
+            String _walletTitle(WalletType wallet) {
+              switch (wallet) {
                 case WalletType.main:
                   return 'موجودی اصلی';
                 case WalletType.subsidy:
                   return 'موجودی یارانه‌ای';
                 case WalletType.emergency:
                   return 'موجودی اضطراری ملی';
-                case WalletType.nationalCrypto:
-                  return 'موجودی رمز ارز ملی';
+                case WalletType.digitalRial:
+                  return 'ریال دیجیتال ملی';
               }
             }
 
-            int _walletBalance(WalletType w) {
-              switch (w) {
+            String _walletSubtitle(WalletType wallet) {
+              switch (wallet) {
                 case WalletType.main:
-                  return mainBalance;
+                  return 'موجودی: ۱۲۰۰۰۰۰ تومان';
                 case WalletType.subsidy:
-                  return subsidyBalance;
+                  return 'موجودی: ۴۰۰۰۰۰ تومان';
                 case WalletType.emergency:
-                  return emergencyBalance;
-                case WalletType.nationalCrypto:
-                  return nationalCryptoBalance;
+                  return 'موجودی: ۲۵۰۰۰۰ تومان';
+                case WalletType.digitalRial:
+                  return 'موجودی: ۰ ریال';
               }
             }
 
-            @override
-            void dispose() {
-              _amountController.dispose();
-              _txCodeController.dispose();
-              super.dispose();
+            void _onPayWithBluetooth() {
+              setState(() {
+                _status =
+                    'وضعیت: آماده‌سازی پرداخت با بلوتوث (دمو بدون اتصال واقعی).';
+              });
+            }
+
+            void _onPayWithQr() {
+              setState(() {
+                _status =
+                    'وضعیت: آماده‌سازی پرداخت با QR کد (دمو بدون اتصال واقعی).';
+              });
+            }
+
+            void _onConfirmPayment() {
+              final amount = _amountController.text.trim();
+              final trace = _traceController.text.trim();
+              if (amount.isEmpty) {
+                setState(() {
+                  _status = 'وضعیت: لطفاً مبلغ پرداخت را وارد کنید.';
+                });
+                return;
+              }
+              final walletName = _walletTitle(_selectedWallet);
+              setState(() {
+                _status =
+                    'وضعیت: تراکنش مبلغ $amount از $walletName (کد: ${trace.isEmpty ? 'بدون کد' : trace}) در حالت دمو شبیه‌سازی شد.';
+              });
             }
 
             @override
             Widget build(BuildContext context) {
-              return Directionality(
-                textDirection: TextDirection.rtl,
-                child: Scaffold(
-                  appBar: AppBar(
-                    title: const Text('اپ آفلاین سوما'),
-                    centerTitle: true,
-                  ),
-                  body: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: ListView(
-                      children: [
-                        const Text(
-                          'اپ خریدار',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('اپ آفلاین سوما'),
+                  centerTitle: true,
+                ),
+                body: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: const [
+                          SizedBox(width: 8),
+                          Text(
+                            'اپ خریدار',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.teal.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        const SizedBox(height: 16),
-
-                        // موجودی اصلی
-                        _buildBalanceCard(),
-
-                        const SizedBox(height: 24),
-
-                        // انتخاب نحوه پرداخت
-                        const Text(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: const [
+                            Text(
+                              'موجودی اصلی',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            SizedBox(height: 12),
+                            Text(
+                              '۱۲۰۰۰۰۰ تومان',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
                           'انتخاب نحوه پرداخت',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        _buildPaymentMethodButtons(),
-
-                        const SizedBox(height: 24),
-
-                        // انتخاب کیف پول برای پرداخت
-                        const Text(
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton(
+                        onPressed: _onPayWithBluetooth,
+                        child: const Text('پرداخت با بلوتوث'),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.tonal(
+                        onPressed: _onPayWithQr,
+                        child: const Text('پرداخت با QR کد'),
+                      ),
+                      const SizedBox(height: 24),
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
                           'انتخاب کیف پول برای پرداخت',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        _buildWalletSelector(),
-
-                        const SizedBox(height: 24),
-
-                        // مبلغ پرداخت
-                        const Text(
+                      ),
+                      const SizedBox(height: 12),
+                      _WalletCard(
+                        title: _walletTitle(WalletType.main),
+                        subtitle: _walletSubtitle(WalletType.main),
+                        selected: _selectedWallet == WalletType.main,
+                        onTap: () => _selectWallet(WalletType.main),
+                      ),
+                      const SizedBox(height: 8),
+                      _WalletCard(
+                        title: _walletTitle(WalletType.subsidy),
+                        subtitle: _walletSubtitle(WalletType.subsidy),
+                        selected: _selectedWallet == WalletType.subsidy,
+                        onTap: () => _selectWallet(WalletType.subsidy),
+                      ),
+                      const SizedBox(height: 8),
+                      _WalletCard(
+                        title: _walletTitle(WalletType.emergency),
+                        subtitle: _walletSubtitle(WalletType.emergency),
+                        selected: _selectedWallet == WalletType.emergency,
+                        onTap: () => _selectWallet(WalletType.emergency),
+                      ),
+                      const SizedBox(height: 8),
+                      _WalletCard(
+                        title: _walletTitle(WalletType.digitalRial),
+                        subtitle: _walletSubtitle(WalletType.digitalRial),
+                        selected: _selectedWallet == WalletType.digitalRial,
+                        onTap: () => _selectWallet(WalletType.digitalRial),
+                      ),
+                      const SizedBox(height: 24),
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
                           'مبلغ پرداخت (تومان)',
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _amountController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            hintText: 'مثلاً ۲۵۰۰۰',
-                          ),
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // کد تراکنش
-                        const Text(
-                          'کد تراکنش',
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        const SizedBox(height: 8),
-                        TextField(
-                          controller: _txCodeController,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            hintText: 'کد/شناسه تراکنش (اختیاری در دمو)',
-                          ),
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // دکمه اصلی شروع پرداخت
-                        FilledButton(
-                          onPressed: _onStartPayment,
-                          child: const Text('تأیید و شروع پرداخت'),
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // وضعیت
-                        Text(
-                          status,
-                          style: const TextStyle(
-                            fontSize: 14,
+                          style: TextStyle(
+                            fontSize: 15,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
-
-            Widget _buildBalanceCard() {
-              final int balance = mainBalance;
-              return Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: Colors.teal.withOpacity(0.06),
-                  border: Border.all(color: Colors.teal.withOpacity(0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'موجودی اصلی',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${balance.toString()} تومان',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _amountController,
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.right,
+                        decoration: InputDecoration(
+                          hintText: 'مثلاً ۲۵۰۰۰ تومان',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          'کد تراکنش',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _traceController,
+                        textAlign: TextAlign.right,
+                        decoration: InputDecoration(
+                          hintText: 'کد / شناسه تراکنش',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton(
+                        onPressed: _onConfirmPayment,
+                        child: const Text('تأیید و شروع پرداخت'),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _status,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               );
             }
+          }
 
-            Widget _buildPaymentMethodButtons() {
-              return Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: () {
-                        setState(() {
-                          _method = PaymentMethod.bluetooth;
-                          status = 'وضعیت: پرداخت با بلوتوث انتخاب شد';
-                        });
-                      },
-                      child: const Text('پرداخت با بلوتوث'),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonal(
-                      onPressed: () {
-                        setState(() {
-                          _method = PaymentMethod.qr;
-                          status = 'وضعیت: پرداخت با QR مد انتخاب شد';
-                        });
-                      },
-                      child: const Text('پرداخت با QR مد'),
-                    ),
-                  ),
-                ],
-              );
-            }
+          class _WalletCard extends StatelessWidget {
+            final String title;
+            final String subtitle;
+            final bool selected;
+            final VoidCallback onTap;
 
-            Widget _buildWalletSelector() {
-              return Column(
-                children: [
-                  _walletTile(WalletType.main),
-                  _walletTile(WalletType.subsidy),
-                  _walletTile(WalletType.emergency),
-                  _walletTile(WalletType.nationalCrypto),
-                ],
-              );
-            }
+            const _WalletCard({
+              required this.title,
+              required this.subtitle,
+              required this.selected,
+              required this.onTap,
+            });
 
-            Widget _walletTile(WalletType type) {
-              final bool selected = _wallet == type;
-              return Card(
-                elevation: selected ? 2 : 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(
+            @override
+            Widget build(BuildContext context) {
+              final colorScheme = Theme.of(context).colorScheme;
+              return InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: onTap,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
                     color: selected
-                        ? Colors.teal
-                        : Colors.grey.withOpacity(0.3),
+                        ? colorScheme.primary.withOpacity(0.08)
+                        : Colors.white,
+                    border: Border.all(
+                      color: selected
+                          ? colorScheme.primary
+                          : Colors.grey.shade300,
+                      width: 1.4,
+                    ),
                   ),
-                ),
-                child: RadioListTile<WalletType>(
-                  value: type,
-                  groupValue: _wallet,
-                  onChanged: (val) {
-                    if (val == null) return;
-                    setState(() {
-                      _wallet = val;
-                      status =
-                          'وضعیت: ${_walletLabel(val)} برای پرداخت انتخاب شد';
-                    });
-                  },
-                  title: Text(_walletLabel(type)),
-                  subtitle: Text(
-                    'موجودی: ${_walletBalance(type)} تومان',
-                    style: const TextStyle(fontSize: 12),
+                  child: Row(
+                    children: [
+                      Icon(
+                        selected
+                            ? Icons.radio_button_checked
+                            : Icons.radio_button_off,
+                        color: selected
+                            ? colorScheme.primary
+                            : Colors.grey.shade500,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              subtitle,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );
-            }
-
-            void _onStartPayment() {
-              final String amount = _amountController.text.trim();
-              if (amount.isEmpty) {
-                setState(() {
-                  status = 'وضعیت: لطفاً مبلغ پرداخت را وارد کنید';
-                });
-                return;
-              }
-
-              final String txCode = _txCodeController.text.trim();
-              final String methodText =
-                  _method == PaymentMethod.bluetooth
-                      ? 'بلوتوث'
-                      : 'QR مد';
-              final String walletText = _walletLabel(_wallet);
-
-              setState(() {
-                status =
-                    'وضعیت: شروع پرداخت $amount تومان از $walletText با $methodText'
-                    '${txCode.isNotEmpty ? ' (کد: $txCode)' : ''}';
-              });
-
-              // در این نسخه فقط پیام وضعیت را عوض می‌کنیم.
-              // در مراحل بعدی به این تابع، منطق واقعی بلوتوث/QR را اضافه می‌کنیم.
             }
           }
           DART
@@ -378,5 +420,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: soma_demo_app-release.apk
+          name: soma_buyer_app-release.apk
           path: soma_demo/build/app/outputs/flutter-apk/app-release.apk
