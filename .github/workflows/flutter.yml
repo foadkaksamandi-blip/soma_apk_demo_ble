@@ -166,7 +166,8 @@ jobs:
             }) {
               final now = DateTime.now();
               final somaCode = somaCodeOverride ?? 'SOMA-${now.millisecondsSinceEpoch}';
-              final bankCode = bankCodeOverride ?? 'BNK${_counter.toString().padLeft(6, '0')}00';
+              final bankCode =
+                  bankCodeOverride ?? 'BNK${_counter.toString().padLeft(6, '0')}00';
               _counter++;
 
               final tx = BuyerTransaction(
@@ -235,12 +236,14 @@ jobs:
               final walletName = _wallets[_selectedWalletIndex].name;
               final balance = BuyerWalletStore.getBalanceByWalletName(walletName);
               setState(() {
-                _statusText = 'وضعیت: $walletName برای پرداخت انتخاب شد - موجودی: $balance تومان';
+                _statusText =
+                    'وضعیت: $walletName برای پرداخت انتخاب شد - موجودی: $balance تومان';
               });
             }
 
             int? _parseAmount() {
-              final raw = _amountController.text.trim().replaceAll('٬', '').replaceAll(',', '');
+              final raw =
+                  _amountController.text.trim().replaceAll('٬', '').replaceAll(',', '');
               if (raw.isEmpty) return null;
               final value = int.tryParse(raw);
               return value;
@@ -251,7 +254,9 @@ jobs:
               final balance = BuyerWalletStore.getBalanceByWalletName(walletName);
               if (amount > balance) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('مبلغ بیشتر از موجودی کیف پول "$walletName" است.')),
+                  SnackBar(
+                      content: Text(
+                          'مبلغ بیشتر از موجودی کیف پول "$walletName" است.')),
                 );
                 return false;
               }
@@ -262,7 +267,9 @@ jobs:
               final amount = _parseAmount();
               if (amount == null || amount <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('لطفاً مبلغ پرداخت را به‌صورت عددی وارد کنید.')),
+                  const SnackBar(
+                      content:
+                          Text('لطفاً مبلغ پرداخت را به‌صورت عددی وارد کنید.')),
                 );
                 return;
               }
@@ -287,7 +294,9 @@ jobs:
               final amount = _parseAmount();
               if (amount == null || amount <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('لطفاً مبلغ پرداخت را به‌صورت عددی وارد کنید.')),
+                  const SnackBar(
+                      content:
+                          Text('لطفاً مبلغ پرداخت را به‌صورت عددی وارد کنید.')),
                 );
                 return;
               }
@@ -340,7 +349,8 @@ jobs:
                           alignment: Alignment.centerRight,
                           child: Text(
                             'اپ خریدار',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.w600),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -348,7 +358,8 @@ jobs:
                         const SizedBox(height: 24),
                         const Text(
                           'انتخاب نحوه پرداخت',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 12),
                         SizedBox(
@@ -369,13 +380,15 @@ jobs:
                         const SizedBox(height: 24),
                         const Text(
                           'انتخاب کیف پول برای پرداخت',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 12),
                         ...List.generate(_wallets.length, (index) {
                           final w = _wallets[index];
                           final selected = index == _selectedWalletIndex;
-                          final balance = BuyerWalletStore.getBalanceByWalletName(w.name);
+                          final balance =
+                              BuyerWalletStore.getBalanceByWalletName(w.name);
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: InkWell(
@@ -388,19 +401,25 @@ jobs:
                               borderRadius: BorderRadius.circular(16),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: selected ? Colors.teal.withOpacity(0.1) : Colors.white,
+                                  color: selected
+                                      ? Colors.teal.withOpacity(0.1)
+                                      : Colors.white,
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: selected ? Colors.teal : Colors.grey.shade300,
+                                    color: selected
+                                        ? Colors.teal
+                                        : Colors.grey.shade300,
                                     width: 1.4,
                                   ),
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 12),
                                 child: Row(
                                   children: [
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             w.name,
@@ -440,7 +459,8 @@ jobs:
                         const SizedBox(height: 16),
                         const Text(
                           'مبلغ پرداخت (تومان)',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 8),
                         TextField(
@@ -456,7 +476,8 @@ jobs:
                         const SizedBox(height: 16),
                         const Text(
                           'کد تراکنش',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w500),
                         ),
                         const SizedBox(height: 8),
                         TextField(
@@ -476,7 +497,8 @@ jobs:
                               _updateStatus();
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('اطلاعات پرداخت ثبت شد. اکنون روش پرداخت را انتخاب کنید.'),
+                                  content: Text(
+                                      'اطلاعات پرداخت ثبت شد. اکنون روش پرداخت را انتخاب کنید.'),
                                 ),
                               );
                             },
@@ -500,14 +522,16 @@ jobs:
 
             Widget _buildBalanceCard() {
               final walletName = _wallets[_selectedWalletIndex].name;
-              final balance = BuyerWalletStore.getBalanceByWalletName(walletName);
+              final balance =
+                  BuyerWalletStore.getBalanceByWalletName(walletName);
               return Container(
                 width: double.infinity,
                 decoration: BoxDecoration(
                   color: Colors.teal.withOpacity(0.06),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -551,7 +575,8 @@ jobs:
             });
 
             @override
-            State<BluetoothPaymentPage> createState() => _BluetoothPaymentPageState();
+            State<BluetoothPaymentPage> createState() =>
+                _BluetoothPaymentPageState();
           }
 
           class _BluetoothPaymentPageState extends State<BluetoothPaymentPage> {
@@ -581,7 +606,9 @@ jobs:
             }
 
             bool get _canConfirm {
-              return _selectedDevice != null && _status == ConnectionStatus.connected && !_isSending;
+              return _selectedDevice != null &&
+                  _status == ConnectionStatus.connected &&
+                  !_isSending;
             }
 
             Future<void> _startScan() async {
@@ -593,7 +620,8 @@ jobs:
               });
 
               try {
-                await FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
+                await FlutterBluePlus.startScan(
+                    timeout: const Duration(seconds: 5));
                 final results = await FlutterBluePlus.scanResults.first;
                 await FlutterBluePlus.stopScan();
 
@@ -642,7 +670,8 @@ jobs:
                 _isSending = true;
               });
 
-              final success = await BuyerWalletStore.deduct(widget.walletName, widget.amount);
+              final success = await BuyerWalletStore.deduct(
+                  widget.walletName, widget.amount);
               if (!success) {
                 if (!mounted) return;
                 setState(() {
@@ -650,7 +679,8 @@ jobs:
                 });
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('موجودی کافی برای انجام این پرداخت وجود ندارد.'),
+                    content:
+                        Text('موجودی کافی برای انجام این پرداخت وجود ندارد.'),
                   ),
                 );
                 return;
@@ -660,7 +690,8 @@ jobs:
                 amount: widget.amount,
                 method: 'بلوتوث (دمو)',
                 walletName: widget.walletName,
-                sellerDescription: _selectedDevice?.platformName ?? 'فروشنده ناشناس (دمو)',
+                sellerDescription:
+                    _selectedDevice?.platformName ?? 'فروشنده ناشناس (دمو)',
               );
 
               if (!mounted) return;
@@ -698,7 +729,8 @@ jobs:
                           alignment: Alignment.centerRight,
                           child: Text(
                             'اپ خریدار',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.w600),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -706,7 +738,8 @@ jobs:
                           alignment: Alignment.centerRight,
                           child: Text(
                             'پرداخت با بلوتوث',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                            style: TextStyle(
+                                fontSize: 17, fontWeight: FontWeight.w700),
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -716,13 +749,16 @@ jobs:
                             color: Colors.teal.withOpacity(0.06),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'مبلغ خرید: $amountText',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600),
                               ),
                               const SizedBox(height: 8),
                               Text(
@@ -738,21 +774,25 @@ jobs:
                           child: FilledButton(
                             onPressed: _isScanning ? null : _startScan,
                             child: Text(
-                              _isScanning ? 'در حال اسکن بلوتوث…' : 'اسکن با بلوتوث',
+                              _isScanning
+                                  ? 'در حال اسکن بلوتوث…'
+                                  : 'اسکن با بلوتوث',
                             ),
                           ),
                         ),
                         const SizedBox(height: 20),
                         const Text(
                           'اپ فروشنده',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         _buildSellerBox(),
                         const SizedBox(height: 20),
                         const Text(
                           'وضعیت اتصال',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         Container(
@@ -760,7 +800,8 @@ jobs:
                           decoration: BoxDecoration(
                             color: Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade300),
+                            border:
+                                Border.all(color: Colors.grey.shade300),
                           ),
                           padding: const EdgeInsets.all(12),
                           child: Text(
@@ -800,7 +841,8 @@ jobs:
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border:
+                        Border.all(color: Colors.grey.shade300),
                   ),
                   padding: const EdgeInsets.all(12),
                   child: Row(
@@ -812,7 +854,8 @@ jobs:
                       ),
                       SizedBox(width: 12),
                       Expanded(
-                        child: Text('در حال جست‌وجو برای اپ‌های فروشنده نزدیک…'),
+                        child: Text(
+                            'در حال جست‌وجو برای اپ‌های فروشنده نزدیک…'),
                       ),
                     ],
                   ),
@@ -825,7 +868,8 @@ jobs:
                   decoration: BoxDecoration(
                     color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade300),
+                    border:
+                        Border.all(color: Colors.grey.shade300),
                   ),
                   padding: const EdgeInsets.all(12),
                   child: const Text(
@@ -846,9 +890,11 @@ jobs:
                 child: Column(
                   children: _scanResults.map((r) {
                     final device = r.device;
-                    final name =
-                        device.platformName.isNotEmpty ? device.platformName : 'Unknown (${device.remoteId.str})';
-                    final selected = _selectedDevice?.remoteId == device.remoteId;
+                    final name = device.platformName.isNotEmpty
+                        ? device.platformName
+                        : 'Unknown (${device.remoteId.str})';
+                    final selected =
+                        _selectedDevice?.remoteId == device.remoteId;
                     return RadioListTile<BluetoothDevice>(
                       value: device,
                       groupValue: _selectedDevice,
@@ -859,7 +905,8 @@ jobs:
                       },
                       activeColor: Colors.teal,
                       title: Text(name),
-                      subtitle: const Text('فروشنده مجاز نزدیک (دمو)'),
+                      subtitle:
+                          const Text('فروشنده مجاز نزدیک (دمو)'),
                       selected: selected,
                     );
                   }).toList(),
@@ -894,7 +941,8 @@ jobs:
               super.initState();
               final now = DateTime.now().millisecondsSinceEpoch;
               _txId = 'TMP$now';
-              _buyerPayload = 'SOMA_PAY|${widget.amount}|${widget.walletName}|$_txId';
+              _buyerPayload =
+                  'SOMA_PAY|${widget.amount}|${widget.walletName}|$_txId';
             }
 
             Future<void> _scanReceipt() async {
@@ -925,17 +973,20 @@ jobs:
               if (amount != widget.amount || somaCode != _txId) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('اطلاعات رسید با مبلغ یا شناسه تراکنش شما همخوانی ندارد.'),
+                    content: Text(
+                        'اطلاعات رسید با مبلغ یا شناسه تراکنش شما همخوانی ندارد.'),
                   ),
                 );
                 return;
               }
 
-              final success = await BuyerWalletStore.deduct(widget.walletName, amount);
+              final success =
+                  await BuyerWalletStore.deduct(widget.walletName, amount);
               if (!success) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('موجودی کافی برای انجام این پرداخت وجود ندارد.'),
+                    content:
+                        Text('موجودی کافی برای انجام این پرداخت وجود ندارد.'),
                   ),
                 );
                 return;
@@ -951,7 +1002,8 @@ jobs:
               );
 
               setState(() {
-                _statusText = 'پرداخت ${tx.amount} تومان با QR دوطرفه با موفقیت انجام شد.';
+                _statusText =
+                    'پرداخت ${tx.amount} تومان با QR دوطرفه با موفقیت انجام شد.';
               });
 
               ScaffoldMessenger.of(context).showSnackBar(
@@ -980,12 +1032,14 @@ jobs:
                       children: [
                         const Text(
                           'اپ خریدار',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 16),
                         const Text(
                           'پرداخت با QR کد',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                              fontSize: 17, fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 16),
                         Container(
@@ -994,13 +1048,16 @@ jobs:
                             color: Colors.teal.withOpacity(0.06),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 20),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 'مبلغ خرید: $amountText',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600),
                               ),
                               const SizedBox(height: 8),
                               Text(
@@ -1013,7 +1070,8 @@ jobs:
                         const SizedBox(height: 24),
                         const Text(
                           'QR اپ خریدار برای فروشنده',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 12),
                         Center(
@@ -1023,7 +1081,8 @@ jobs:
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                  color:
+                                      Colors.black.withOpacity(0.05),
                                   blurRadius: 8,
                                   offset: const Offset(0, 4),
                                 ),
@@ -1047,7 +1106,8 @@ jobs:
                         const SizedBox(height: 24),
                         const Text(
                           'مرحله دوم: اسکن QR رسید فروشنده',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         SizedBox(
@@ -1060,7 +1120,8 @@ jobs:
                         const SizedBox(height: 24),
                         const Text(
                           'وضعیت پرداخت',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         Container(
@@ -1068,7 +1129,8 @@ jobs:
                           decoration: BoxDecoration(
                             color: Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade300),
+                            border:
+                                Border.all(color: Colors.grey.shade300),
                           ),
                           padding: const EdgeInsets.all(12),
                           child: Text(
@@ -1129,13 +1191,15 @@ jobs:
                 context: context,
                 isScrollControlled: true,
                 shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(24)),
                 ),
                 builder: (context) {
                   return Directionality(
                     textDirection: TextDirection.rtl,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                      padding:
+                          const EdgeInsets.fromLTRB(20, 16, 20, 24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1144,10 +1208,12 @@ jobs:
                             child: Container(
                               width: 40,
                               height: 4,
-                              margin: const EdgeInsets.only(bottom: 16),
+                              margin:
+                                  const EdgeInsets.only(bottom: 16),
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade400,
-                                borderRadius: BorderRadius.circular(999),
+                                borderRadius:
+                                    BorderRadius.circular(999),
                               ),
                             ),
                           ),
@@ -1163,16 +1229,21 @@ jobs:
                           const SizedBox(height: 24),
                           _receiptRow('مبلغ:', '${tx.amount} تومان'),
                           _receiptRow('روش پرداخت:', tx.method),
-                          _receiptRow('فروشنده:', tx.sellerDescription),
+                          _receiptRow(
+                              'فروشنده:', tx.sellerDescription),
                           _receiptRow('کیف پول:', tx.walletName),
-                          _receiptRow('زمان ثبت روی گوشی:', _formatDateTime(tx.time)),
-                          _receiptRow('کد تراکنش سوما:', tx.somaCode),
-                          _receiptRow('کد پیگیری بانک (دمو):', tx.bankCode),
+                          _receiptRow('زمان ثبت روی گوشی:',
+                              _formatDateTime(tx.time)),
+                          _receiptRow(
+                              'کد تراکنش سوما:', tx.somaCode),
+                          _receiptRow('کد پیگیری بانک (دمو):',
+                              tx.bankCode),
                           const SizedBox(height: 24),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton(
-                              onPressed: () => Navigator.pop(context),
+                              onPressed: () =>
+                                  Navigator.pop(context),
                               child: const Text('بستن رسید'),
                             ),
                           ),
@@ -1230,17 +1301,22 @@ jobs:
                           itemBuilder: (context, index) {
                             final tx = txs[index];
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
+                              padding:
+                                  const EdgeInsets.only(bottom: 12),
                               child: InkWell(
-                                onTap: () => _showReceipt(context, tx),
-                                borderRadius: BorderRadius.circular(16),
+                                onTap: () =>
+                                    _showReceipt(context, tx),
+                                borderRadius:
+                                    BorderRadius.circular(16),
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius:
+                                        BorderRadius.circular(16),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.03),
+                                        color: Colors.black
+                                            .withOpacity(0.03),
                                         blurRadius: 6,
                                         offset: const Offset(0, 3),
                                       ),
@@ -1248,19 +1324,22 @@ jobs:
                                   ),
                                   padding: const EdgeInsets.all(16),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'پرداخت ${tx.amount} تومان',
                                         style: const TextStyle(
                                           fontSize: 16,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight:
+                                              FontWeight.w600,
                                         ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         'روش: ${tx.method}',
-                                        style: const TextStyle(fontSize: 13),
+                                        style: const TextStyle(
+                                            fontSize: 13),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
@@ -1323,7 +1402,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Set up Flutter (stable)
         uses: subosito/flutter-action@v2
@@ -1405,15 +1484,18 @@ jobs:
               String? bankCodeOverride,
             }) {
               final now = DateTime.now();
-              final somaCode = somaCodeOverride ?? 'SOMA-${now.millisecondsSinceEpoch}';
-              final bankCode = bankCodeOverride ?? 'BNK${_counter.toString().padLeft(6, '0')}00';
+              final somaCode =
+                  somaCodeOverride ?? 'SOMA-${now.millisecondsSinceEpoch}';
+              final bankCode =
+                  bankCodeOverride ?? 'BNK${_counter.toString().padLeft(6, '0')}00';
               _counter++;
 
               final tx = SellerTransaction(
                 amount: amount,
                 method: method,
                 time: now,
-                description: descriptionOverride ?? 'پرداخت دمو از خریدار آفلاین سوما',
+                description: descriptionOverride ??
+                    'پرداخت دمو از خریدار آفلاین سوما',
                 somaCode: somaCode,
                 bankCode: bankCode,
               );
@@ -1585,7 +1667,8 @@ jobs:
                   color: Colors.teal.withOpacity(0.06),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
@@ -1627,7 +1710,8 @@ jobs:
                   color: Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1695,7 +1779,8 @@ jobs:
                               await SellerWalletStore.add(tx.amount);
                               Navigator.pop(context);
                             },
-                            child: const Text('ثبت پرداخت آزمایشی ۱۰۰۰۰ تومانی'),
+                            child:
+                                const Text('ثبت پرداخت آزمایشی ۱۰۰۰۰ تومانی'),
                           ),
                         ),
                       ],
@@ -1711,11 +1796,14 @@ jobs:
             const SellerQrReceivePage({super.key});
 
             @override
-            State<SellerQrReceivePage> createState() => _SellerQrReceivePageState();
+            State<SellerQrReceivePage> createState() =>
+                _SellerQrReceivePageState();
           }
 
-          class _SellerQrReceivePageState extends State<SellerQrReceivePage> {
-            final TextEditingController _amountController = TextEditingController();
+          class _SellerQrReceivePageState
+              extends State<SellerQrReceivePage> {
+            final TextEditingController _amountController =
+                TextEditingController();
             String _statusText =
                 'ابتدا مبلغ خرید را وارد کنید، سپس QR اپ خریدار را اسکن کنید.';
             SellerTransaction? _confirmedTx;
@@ -1732,12 +1820,16 @@ jobs:
             }
 
             Future<void> _scanBuyerQr() async {
-              final rawAmount = _amountController.text.trim().replaceAll('٬', '').replaceAll(',', '');
+              final rawAmount = _amountController.text
+                  .trim()
+                  .replaceAll('٬', '')
+                  .replaceAll(',', '');
               final amount = int.tryParse(rawAmount) ?? 0;
               if (amount <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('لطفاً مبلغ خرید را به‌صورت عددی وارد کنید.'),
+                    content:
+                        Text('لطفاً مبلغ خرید را به‌صورت عددی وارد کنید.'),
                   ),
                 );
                 return;
@@ -1767,11 +1859,13 @@ jobs:
 
               if (buyerAmount != amount) {
                 setState(() {
-                  _statusText = 'مبلغ واردشده با مبلغ داخل QR خریدار همخوانی ندارد.';
+                  _statusText =
+                      'مبلغ واردشده با مبلغ داخل QR خریدار همخوانی ندارد.';
                 });
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('مبلغ خریدار با مبلغ ثبت‌شده برای این خرید متفاوت است.'),
+                    content: Text(
+                        'مبلغ خریدار با مبلغ ثبت‌شده برای این خرید متفاوت است.'),
                   ),
                 );
                 return;
@@ -1780,7 +1874,8 @@ jobs:
               final tx = SellerStore.addDemoPayment(
                 amount: amount,
                 method: 'QR دوطرفه (دمو)',
-                descriptionOverride: 'پرداخت از خریدار آفلاین سوما با QR ($buyerWallet)',
+                descriptionOverride:
+                    'پرداخت از خریدار آفلاین سوما با QR ($buyerWallet)',
                 somaCodeOverride: txId,
               );
               await SellerWalletStore.add(tx.amount);
@@ -1808,7 +1903,8 @@ jobs:
                       children: [
                         const Text(
                           'مبلغ خرید',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         TextField(
@@ -1832,7 +1928,8 @@ jobs:
                         const SizedBox(height: 24),
                         const Text(
                           'وضعیت دریافت',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         Container(
@@ -1840,7 +1937,8 @@ jobs:
                           decoration: BoxDecoration(
                             color: Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade300),
+                            border:
+                                Border.all(color: Colors.grey.shade300),
                           ),
                           padding: const EdgeInsets.all(12),
                           child: Text(
@@ -1849,20 +1947,25 @@ jobs:
                           ),
                         ),
                         const SizedBox(height: 24),
-                        if (_receiptPayload != null && _confirmedTx != null) ...[
+                        if (_receiptPayload != null &&
+                            _confirmedTx != null) ...[
                           const Text(
                             'QR رسید نهایی برای خریدار',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 12),
                           Center(
                             child: Container(
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius:
+                                    BorderRadius.circular(16),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
+                                    color: Colors.black
+                                        .withOpacity(0.05),
                                     blurRadius: 8,
                                     offset: const Offset(0, 4),
                                   ),
@@ -1937,13 +2040,15 @@ jobs:
                 context: context,
                 isScrollControlled: true,
                 shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(24)),
                 ),
                 builder: (context) {
                   return Directionality(
                     textDirection: TextDirection.rtl,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                      padding:
+                          const EdgeInsets.fromLTRB(20, 16, 20, 24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1952,10 +2057,12 @@ jobs:
                             child: Container(
                               width: 40,
                               height: 4,
-                              margin: const EdgeInsets.only(bottom: 16),
+                              margin:
+                                  const EdgeInsets.only(bottom: 16),
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade400,
-                                borderRadius: BorderRadius.circular(999),
+                                borderRadius:
+                                    BorderRadius.circular(999),
                               ),
                             ),
                           ),
@@ -1973,14 +2080,18 @@ jobs:
                           _receiptRow('روش دریافت:', tx.method),
                           _receiptRow('فروشنده:', 'سوپرمارکت آزمایشی سوما'),
                           _receiptRow('کیف پول:', 'کیف پول فروشنده'),
-                          _receiptRow('زمان ثبت روی گوشی:', _formatDateTime(tx.time)),
-                          _receiptRow('کد تراکنش سوما:', tx.somaCode),
-                          _receiptRow('کد پیگیری بانک (دمو):', tx.bankCode),
+                          _receiptRow('زمان ثبت روی گوشی:',
+                              _formatDateTime(tx.time)),
+                          _receiptRow(
+                              'کد تراکنش سوما:', tx.somaCode),
+                          _receiptRow('کد پیگیری بانک (دمو):',
+                              tx.bankCode),
                           const SizedBox(height: 24),
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton(
-                              onPressed: () => Navigator.pop(context),
+                              onPressed: () =>
+                                  Navigator.pop(context),
                               child: const Text('بستن رسید'),
                             ),
                           ),
@@ -2038,17 +2149,22 @@ jobs:
                           itemBuilder: (context, index) {
                             final tx = txs[index];
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
+                              padding:
+                                  const EdgeInsets.only(bottom: 12),
                               child: InkWell(
-                                onTap: () => _showReceipt(context, tx),
-                                borderRadius: BorderRadius.circular(16),
+                                onTap: () =>
+                                    _showReceipt(context, tx),
+                                borderRadius:
+                                    BorderRadius.circular(16),
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
+                                    borderRadius:
+                                        BorderRadius.circular(16),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.03),
+                                        color: Colors.black
+                                            .withOpacity(0.03),
                                         blurRadius: 6,
                                         offset: const Offset(0, 3),
                                       ),
@@ -2056,19 +2172,22 @@ jobs:
                                   ),
                                   padding: const EdgeInsets.all(16),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'پرداخت ${tx.amount} تومان',
                                         style: const TextStyle(
                                           fontSize: 16,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight:
+                                              FontWeight.w600,
                                         ),
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
                                         'روش: ${tx.method}',
-                                        style: const TextStyle(fontSize: 13),
+                                        style: const TextStyle(
+                                            fontSize: 13),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
