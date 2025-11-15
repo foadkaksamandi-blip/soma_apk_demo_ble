@@ -1277,3 +1277,304 @@ jobs:
         with:
           name: soma_demo_app-release.apk
           path: soma_demo/build/app/outputs/flutter-apk/app-release.apk
+
+  build-android-seller:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Create seller app
+        run: |
+          flutter --version
+          rm -rf soma_seller || true
+          flutter create --platforms=android soma_seller
+
+      - name: Write seller main.dart
+        working-directory: soma_seller
+        shell: bash
+        run: |
+          mkdir -p lib
+          cat > lib/main.dart <<'DART'
+          import 'package:flutter/material.dart';
+
+          void main() {
+            runApp(const SomaSellerApp());
+          }
+
+          class SomaSellerApp extends StatelessWidget {
+            const SomaSellerApp({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                title: 'اپ آفلاین سوما – فروشنده',
+                debugShowCheckedModeBanner: false,
+                theme: ThemeData(
+                  useMaterial3: true,
+                  colorSchemeSeed: Colors.teal,
+                ),
+                home: const SellerHomePage(),
+              );
+            }
+          }
+
+          /// صفحه اول – اپ فروشنده
+          class SellerHomePage extends StatelessWidget {
+            const SellerHomePage({super.key});
+
+            void _showComingSoon(BuildContext context, String title) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('$title در نسخه بعدی دمو اضافه می‌شود.')),
+              );
+            }
+
+            @override
+            Widget build(BuildContext context) {
+              return Directionality(
+                textDirection: TextDirection.rtl,
+                child: Scaffold(
+                  appBar: AppBar(
+                    title: const Text('اپ آفلاین سوما'),
+                    actions: [
+                      IconButton(
+                        tooltip: 'گزارش تراکنش‌ها و رسیدها',
+                        icon: const Icon(Icons.receipt_long_outlined),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const SellerTransactionsPage(),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  body: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            'اپ فروشنده',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // کارت مشخصات فروشنده ثبت‌شده و امن
+                        _buildSellerIdentityCard(),
+
+                        const SizedBox(height: 16),
+
+                        // کارت موجودی کیف پول فروشنده
+                        _buildSellerBalanceCard(),
+
+                        const SizedBox(height: 24),
+
+                        const Text(
+                          'انتخاب نحوه دریافت',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: () => _showComingSoon(
+                              context,
+                              'دریافت با بلوتوث',
+                            ),
+                            child: const Text('دریافت با بلوتوث'),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.tonal(
+                            onPressed: () => _showComingSoon(
+                              context,
+                              'دریافت با QR کد',
+                            ),
+                            child: const Text('دریافت با QR کد'),
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        Text(
+                          'برای مشاهده جزئیات تراکنش‌ها و رسیدها، روی آیکن گزارش در بالای صفحه بزنید.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            Widget _buildSellerIdentityCard() {
+              return Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.teal.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 20,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'مشخصات فروشنده ثبت‌شده',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'فروشنده: سوپرمارکت آزمایشی سوما',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'کد پذیرنده: SOMA-STORE-01',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'کد ترمینال: TRM-0001',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.verified_user,
+                          color: Colors.teal.shade700,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'وضعیت: فروشنده ثبت‌شده و مورد تأیید بانک (دمو)',
+                            style: TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            Widget _buildSellerBalanceCard() {
+              const int currentBalance = 0;
+              const int todayTotal = 0;
+
+              return Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 20,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'موجودی کیف پول فروشنده',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$currentBalance تومان',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'مجموع دریافتی امروز: $todayTotal تومان (دمو)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          }
+
+          /// صفحه گزارش تراکنش‌ها و رسیدهای فروشنده (فعلاً ساده)
+          class SellerTransactionsPage extends StatelessWidget {
+            const SellerTransactionsPage({super.key});
+
+            @override
+            Widget build(BuildContext context) {
+              return Directionality(
+                textDirection: TextDirection.rtl,
+                child: Scaffold(
+                  appBar: AppBar(
+                    title: const Text('گزارش تراکنش‌ها و رسیدها'),
+                  ),
+                  body: Center(
+                    child: Text(
+                      'هنوز هیچ تراکنشی برای فروشنده در دمو ثبت نشده است.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+          }
+          DART
+
+      - name: Build release APK (seller)
+        working-directory: soma_seller
+        run: flutter build apk --release --no-shrink
+
+      - name: Upload APK (seller)
+        uses: actions/upload-artifact@v4
+        with:
+          name: soma_seller_app-release.apk
+          path: soma_seller/build/app/outputs/flutter-apk/app-release.apk
