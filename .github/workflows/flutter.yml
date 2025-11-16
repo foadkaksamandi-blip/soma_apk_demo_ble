@@ -383,7 +383,7 @@ jobs:
                           style: TextStyle(
                               fontSize: 16, fontWeight: FontWeight.w600),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox	height: 12),
                         ...List.generate(_wallets.length, (index) {
                           final w = _wallets[index];
                           final selected = index == _selectedWalletIndex;
@@ -1349,7 +1349,7 @@ jobs:
                                           color: Colors.grey,
                                         ),
                                       ),
-                                      const SizedBox(height: 2),
+                                      const SizedBox	height: 2),
                                       Text(
                                         'زمان: ${_formatDateTime(tx.time)}',
                                         style: const TextStyle(
