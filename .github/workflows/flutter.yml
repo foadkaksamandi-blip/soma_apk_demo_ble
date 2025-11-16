@@ -6,7 +6,7 @@ on:
 
 jobs:
   # =========================
-  # اپ خریدار (۴ صفحه + موجودی واقعی + تاریخچه + QR دوطرفه)
+  # اپ خریدار (۴ صفحه + موجودی واقعی + تاریخچه + QR دوطرفه + بلوتوث با اتصال واقعی)
   # =========================
   build-buyer:
     runs-on: ubuntu-latest
@@ -563,7 +563,7 @@ jobs:
             error,
           }
 
-          /// صفحه دوم – پرداخت با بلوتوث (کسر موجودی واقعی بعد از تأیید دمو)
+          /// صفحه دوم – پرداخت با بلوتوث (اتصال واقعی + کسر موجودی واقعی بعد از تأیید)
           class BluetoothPaymentPage extends StatefulWidget {
             final int amount;
             final String walletName;
@@ -611,6 +611,12 @@ jobs:
                   !_isSending;
             }
 
+            @override
+            void dispose() {
+              _selectedDevice?.disconnect();
+              super.dispose();
+            }
+
             Future<void> _startScan() async {
               setState(() {
                 _isScanning = true;
@@ -654,13 +660,24 @@ jobs:
                 _selectedDevice = r.device;
                 _status = ConnectionStatus.connecting;
               });
+              _connectToSelected();
+            }
 
-              Future.delayed(const Duration(seconds: 1), () {
+            Future<void> _connectToSelected() async {
+              final device = _selectedDevice;
+              if (device == null) return;
+              try {
+                await device.connect(timeout: const Duration(seconds: 8));
                 if (!mounted) return;
                 setState(() {
                   _status = ConnectionStatus.connected;
                 });
-              });
+              } catch (e) {
+                if (!mounted) return;
+                setState(() {
+                  _status = ConnectionStatus.error;
+                });
+              }
             }
 
             Future<void> _confirmAndSend() async {
@@ -688,21 +705,26 @@ jobs:
 
               final tx = BuyerStore.addTransaction(
                 amount: widget.amount,
-                method: 'بلوتوث (دمو)',
+                method: 'بلوتوث (اتصال واقعی دمو)',
                 walletName: widget.walletName,
                 sellerDescription:
                     _selectedDevice?.platformName ?? 'فروشنده ناشناس (دمو)',
               );
 
+              try {
+                await _selectedDevice?.disconnect();
+              } catch (_) {}
+
               if (!mounted) return;
               setState(() {
                 _isSending = false;
+                _status = ConnectionStatus.idle;
               });
 
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'پرداخت ${tx.amount} تومان به فروشنده "${tx.sellerDescription}" با بلوتوث (دمو) ثبت شد.',
+                    'پرداخت ${tx.amount} تومان به فروشنده "${tx.sellerDescription}" با بلوتوث ثبت شد.',
                   ),
                 ),
               );
@@ -1741,7 +1763,7 @@ jobs:
             }
           }
 
-          // صفحه دریافت با بلوتوث (دمو – فقط شبیه‌سازی)
+          // صفحه دریافت با بلوتوث (دمو – ثبت پرداخت آزمایشی و افزایش موجودی)
           class SellerBluetoothReceivePage extends StatelessWidget {
             const SellerBluetoothReceivePage({super.key});
 
@@ -1759,7 +1781,7 @@ jobs:
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'در نسخه نهایی، این صفحه برای اتصال امن بلوتوث با اپ خریدار استفاده می‌شود.',
+                          'در نسخه نهایی بانک، این صفحه برای اتصال امن بلوتوث با اپ خریدار استفاده می‌شود.',
                           style: TextStyle(fontSize: 14),
                         ),
                         const SizedBox(height: 12),
