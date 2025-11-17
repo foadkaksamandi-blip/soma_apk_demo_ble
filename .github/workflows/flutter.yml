@@ -6,7 +6,7 @@ on:
 
 jobs:
   # =========================
-  # اپ خریدار (۴ صفحه + موجودی واقعی + تاریخچه + QR دوطرفه + بلوتوث با اتصال واقعی)
+  # اپ خریدار (۴ صفحه + موجودی واقعی + تاریخچه + QR دوطرفه)
   # =========================
   build-buyer:
     runs-on: ubuntu-latest
@@ -563,7 +563,7 @@ jobs:
             error,
           }
 
-          /// صفحه دوم – پرداخت با بلوتوث (اتصال واقعی + کسر موجودی واقعی بعد از تأیید)
+          /// صفحه دوم – پرداخت با بلوتوث (کسر موجودی واقعی بعد از تأیید دمو)
           class BluetoothPaymentPage extends StatefulWidget {
             final int amount;
             final String walletName;
@@ -611,12 +611,6 @@ jobs:
                   !_isSending;
             }
 
-            @override
-            void dispose() {
-              _selectedDevice?.disconnect();
-              super.dispose();
-            }
-
             Future<void> _startScan() async {
               setState(() {
                 _isScanning = true;
@@ -655,19 +649,14 @@ jobs:
               }
             }
 
-            void _selectDevice(ScanResult r) {
+            Future<void> _selectDevice(ScanResult r) async {
               setState(() {
                 _selectedDevice = r.device;
                 _status = ConnectionStatus.connecting;
               });
-              _connectToSelected();
-            }
 
-            Future<void> _connectToSelected() async {
-              final device = _selectedDevice;
-              if (device == null) return;
               try {
-                await device.connect(timeout: const Duration(seconds: 8));
+                await r.device.connect(timeout: const Duration(seconds: 8));
                 if (!mounted) return;
                 setState(() {
                   _status = ConnectionStatus.connected;
@@ -677,6 +666,12 @@ jobs:
                 setState(() {
                   _status = ConnectionStatus.error;
                 });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content:
+                        Text('اتصال بلوتوث با فروشنده با مشکل مواجه شد.'),
+                  ),
+                );
               }
             }
 
@@ -705,26 +700,21 @@ jobs:
 
               final tx = BuyerStore.addTransaction(
                 amount: widget.amount,
-                method: 'بلوتوث (اتصال واقعی دمو)',
+                method: 'بلوتوث (دمو)',
                 walletName: widget.walletName,
                 sellerDescription:
                     _selectedDevice?.platformName ?? 'فروشنده ناشناس (دمو)',
               );
 
-              try {
-                await _selectedDevice?.disconnect();
-              } catch (_) {}
-
               if (!mounted) return;
               setState(() {
                 _isSending = false;
-                _status = ConnectionStatus.idle;
               });
 
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    'پرداخت ${tx.amount} تومان به فروشنده "${tx.sellerDescription}" با بلوتوث ثبت شد.',
+                    'پرداخت ${tx.amount} تومان به فروشنده "${tx.sellerDescription}" با بلوتوث (دمو) ثبت شد.',
                   ),
                 ),
               );
@@ -806,7 +796,7 @@ jobs:
                         const Text(
                           'اپ فروشنده',
                           style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600),
+                              fontSize: 16, FontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         _buildSellerBox(),
@@ -814,7 +804,7 @@ jobs:
                         const Text(
                           'وضعیت اتصال',
                           style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600),
+                              fontSize: 16, FontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         Container(
@@ -1093,7 +1083,7 @@ jobs:
                         const Text(
                           'QR اپ خریدار برای فروشنده',
                           style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600),
+                              fontSize: 16, FontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 12),
                         Center(
@@ -1129,7 +1119,7 @@ jobs:
                         const Text(
                           'مرحله دوم: اسکن QR رسید فروشنده',
                           style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600),
+                              fontSize: 16, FontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         SizedBox(
@@ -1143,7 +1133,7 @@ jobs:
                         const Text(
                           'وضعیت پرداخت',
                           style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600),
+                              fontSize: 16, FontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         Container(
@@ -1763,7 +1753,7 @@ jobs:
             }
           }
 
-          // صفحه دریافت با بلوتوث (دمو – ثبت پرداخت آزمایشی و افزایش موجودی)
+          // صفحه دریافت با بلوتوث (دمو – فقط شبیه‌سازی)
           class SellerBluetoothReceivePage extends StatelessWidget {
             const SellerBluetoothReceivePage({super.key});
 
@@ -1781,7 +1771,7 @@ jobs:
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'در نسخه نهایی بانک، این صفحه برای اتصال امن بلوتوث با اپ خریدار استفاده می‌شود.',
+                          'در نسخه نهایی، این صفحه برای اتصال امن بلوتوث با اپ خریدار استفاده می‌شود.',
                           style: TextStyle(fontSize: 14),
                         ),
                         const SizedBox(height: 12),
@@ -1926,7 +1916,7 @@ jobs:
                         const Text(
                           'مبلغ خرید',
                           style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600),
+                              fontSize: 16, FontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         TextField(
@@ -1951,7 +1941,7 @@ jobs:
                         const Text(
                           'وضعیت دریافت',
                           style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600),
+                              fontSize: 16, FontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 8),
                         Container(
