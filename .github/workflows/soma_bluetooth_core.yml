@@ -1,8 +1,11 @@
-name: Soma Bluetooth Core
+name: soma-bt-core
 
 on:
   push:
-  pull_request:
+    branches: [ master ]
+    paths:
+      - ".github/workflows/soma_bluetooth_core.yml"
+  workflow_dispatch:
 
 jobs:
   build-bt-core:
@@ -22,26 +25,46 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          cache: true
 
-      - name: Create soma_bluetooth_core project & deps
-        run: |
-          flutter --version
-          rm -rf soma_bluetooth_core || true
-          flutter create --platforms=android soma_bluetooth_core
-          cd soma_bluetooth_core
-          flutter pub add flutter_blue_plus
-
-      - name: Write soma_bluetooth_core/lib/main.dart
-        working-directory: soma_bluetooth_core
+      - name: Create or update soma_bluetooth_core project & files
         shell: bash
         run: |
-          mkdir -p lib
-          cat > lib/main.dart <<'DART'
-          import 'dart:async';
+          set -e
 
+          # اگر پروژه وجود نداشت بساز
+          if [ ! -d "soma_bluetooth_core" ]; then
+            flutter create soma_bluetooth_core
+          fi
+
+          # pubspec.yaml مخصوص هسته بلوتوث
+          cat > soma_bluetooth_core/pubspec.yaml << 'EOF'
+          name: soma_bluetooth_core
+          description: Core Bluetooth demo for Soma offline module.
+          publish_to: "none"
+
+          version: 1.0.0+1
+
+          environment:
+            sdk: ">=3.4.0 <4.0.0"
+
+          dependencies:
+            flutter:
+              sdk: flutter
+            flutter_blue: ^0.8.0
+
+          dev_dependencies:
+            flutter_test:
+              sdk: flutter
+            flutter_lints: ^4.0.0
+
+          flutter:
+            uses-material-design: true
+          EOF
+
+          # lib/main.dart – هسته ساده بلوتوث واقعی (اسکن + اتصال)
+          cat > soma_bluetooth_core/lib/main.dart << 'EOF'
           import 'package:flutter/material.dart';
-          import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+          import 'package:flutter_blue/flutter_blue.dart';
 
           void main() {
             WidgetsFlutterBinding.ensureInitialized();
@@ -55,461 +78,301 @@ jobs:
             Widget build(BuildContext context) {
               return MaterialApp(
                 debugShowCheckedModeBanner: false,
-                title: 'SOMA Bluetooth Core',
+                title: 'Soma Bluetooth Core',
                 theme: ThemeData(
+                  colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
                   useMaterial3: true,
-                  colorSchemeSeed: Colors.teal,
                 ),
-                home: const BtHomePage(),
+                home: const DeviceScanPage(),
               );
             }
           }
 
-          enum BtConnectionState {
-            idle,
-            scanning,
-            found,
-            connecting,
-            connected,
-            disconnected,
-            error,
-          }
-
-          class BtHomePage extends StatefulWidget {
-            const BtHomePage({super.key});
+          /// صفحه اصلی: اسکن دستگاه‌های اطراف و انتخاب یکی برای اتصال
+          class DeviceScanPage extends StatefulWidget {
+            const DeviceScanPage({super.key});
 
             @override
-            State<BtHomePage> createState() => _BtHomePageState();
+            State<DeviceScanPage> createState() => _DeviceScanPageState();
           }
 
-          class _BtHomePageState extends State<BtHomePage> {
-            final TextEditingController _payloadController =
-                TextEditingController(text: 'AMOUNT=25000;DESC=SOMA DEMO;');
-            BtConnectionState _state = BtConnectionState.idle;
-
-            List<ScanResult> _results = [];
-            StreamSubscription<List<ScanResult>>? _scanSub;
-            BluetoothDevice? _selectedDevice;
-            StreamSubscription<BluetoothConnectionState>? _deviceStateSub;
+          class _DeviceScanPageState extends State<DeviceScanPage> {
+            final FlutterBlue _flutterBlue = FlutterBlue.instance;
+            Stream<List<ScanResult>> get _scanResults => _flutterBlue.scanResults;
 
             bool _isScanning = false;
-            bool _sendInProgress = false;
+
+            Future<void> _startScan() async {
+              if (_isScanning) return;
+              setState(() {
+                _isScanning = true;
+              });
+              await _flutterBlue.startScan(
+                timeout: const Duration(seconds: 8),
+              );
+              await Future.delayed(const Duration(seconds: 8));
+              await _flutterBlue.stopScan();
+              if (mounted) {
+                setState(() {
+                  _isScanning = false;
+                });
+              }
+            }
 
             @override
             void initState() {
               super.initState();
-              FlutterBluePlus.setLogLevel(LogLevel.verbose, color: false);
+              // روی شروع صفحه یک‌بار اسکن
+              _startScan();
             }
 
             @override
-            void dispose() {
-              _payloadController.dispose();
-              _scanSub?.cancel();
-              _deviceStateSub?.cancel();
-              super.dispose();
-            }
+            Widget build(BuildContext context) {
+              return Scaffold(
+                appBar: AppBar(
+                  title: const Text('Soma Bluetooth Core'),
+                ),
+                body: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              'Nearby Bluetooth LE devices',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              _isScanning ? Icons.stop : Icons.refresh,
+                            ),
+                            onPressed: _isScanning ? null : _startScan,
+                            tooltip: _isScanning ? 'Scanning...' : 'Scan again',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: StreamBuilder<List<ScanResult>>(
+                        stream: _scanResults,
+                        initialData: const [],
+                        builder: (context, snapshot) {
+                          final results = snapshot.data ?? [];
+                          if (results.isEmpty) {
+                            return const Center(
+                              child: Text('No devices found yet'),
+                            );
+                          }
+                          return ListView.builder(
+                            itemCount: results.length,
+                            itemBuilder: (context, index) {
+                              final r = results[index];
+                              final device = r.device;
 
-            String get _statusText {
-              switch (_state) {
-                case BtConnectionState.idle:
-                  return 'برای شروع، بلوتوث گوشی را روشن کنید و روی دکمه "اسکن دستگاه‌های نزدیک" بزنید.';
-                case BtConnectionState.scanning:
-                  return 'در حال اسکن بلوتوث… اپ/دستگاه مورد نظر را از لیست انتخاب کنید.';
-                case BtConnectionState.found:
-                  return 'لیست دستگاه‌های نزدیک را در پایین می‌بینید. یکی را انتخاب کنید.';
-                case BtConnectionState.connecting:
-                  return 'در حال اتصال به دستگاه انتخاب‌شده…';
-                case BtConnectionState.connected:
-                  return 'اتصال برقرار است. می‌توانید پیغام آزمایشی (حاوی مبلغ/متن) را ارسال کنید (دمو).';
-                case BtConnectionState.disconnected:
-                  return 'اتصال قطع شده است. می‌توانید دوباره اسکن یا اتصال را تکرار کنید.';
-                case BtConnectionState.error:
-                  return 'خطا در فرآیند بلوتوث. دوباره تلاش کنید یا دستگاه دیگری را انتخاب کنید.';
-              }
+                              return ListTile(
+                                title: Text(
+                                  device.name.isNotEmpty
+                                      ? device.name
+                                      : device.id.id,
+                                ),
+                                subtitle: Text('RSSI: ${r.rssi}'),
+                                trailing: const Icon(Icons.bluetooth),
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => DeviceDetailPage(
+                                        device: device,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
             }
+          }
 
-            Future<void> _startScan() async {
-              _scanSub?.cancel();
+          /// صفحه جزئیات دستگاه: اتصال / قطع اتصال و نمایش سرویس‌ها
+          class DeviceDetailPage extends StatefulWidget {
+            const DeviceDetailPage({super.key, required this.device});
+
+            final BluetoothDevice device;
+
+            @override
+            State<DeviceDetailPage> createState() => _DeviceDetailPageState();
+          }
+
+          class _DeviceDetailPageState extends State<DeviceDetailPage> {
+            bool _connecting = false;
+            bool _connected = false;
+            List<BluetoothService> _services = const [];
+
+            Future<void> _connect() async {
+              if (_connected || _connecting) return;
               setState(() {
-                _results = [];
-                _isScanning = true;
-                _state = BtConnectionState.scanning;
-                _selectedDevice = null;
+                _connecting = true;
               });
-
               try {
-                // اجازه می‌دهیم کاربر هر دستگاهی را انتخاب کند؛
-                // در نسخه‌های بعدی می‌توانیم آن را به دستگاه‌هایی با نام SOMA- محدود کنیم.
-                _scanSub = FlutterBluePlus.scanResults.listen((results) {
-                  if (!mounted) return;
-                  setState(() {
-                    _results = results;
-                    if (_results.isNotEmpty &&
-                        _state == BtConnectionState.scanning) {
-                      _state = BtConnectionState.found;
-                    }
-                  });
-                });
-
-                await FlutterBluePlus.startScan(
-                  timeout: const Duration(seconds: 8),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                setState(() {
-                  _state = BtConnectionState.error;
-                });
-              } finally {
-                await FlutterBluePlus.stopScan();
+                await widget.device.connect();
+                final services = await widget.device.discoverServices();
                 if (mounted) {
                   setState(() {
-                    _isScanning = false;
+                    _services = services;
+                    _connected = true;
+                  });
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Connection error: $e'),
+                    ),
+                  );
+                }
+              } finally {
+                if (mounted) {
+                  setState(() {
+                    _connecting = false;
                   });
                 }
               }
             }
 
-            Future<void> _connectToDevice(BluetoothDevice device) async {
-              _deviceStateSub?.cancel();
-              setState(() {
-                _selectedDevice = device;
-                _state = BtConnectionState.connecting;
-              });
-
-              try {
-                // اگر از قبل متصل است، قطع و دوباره وصل می‌کنیم.
-                await device.disconnect();
-              } catch (_) {}
-
-              try {
-                await device.connect(timeout: const Duration(seconds: 10));
-
-                _deviceStateSub =
-                    device.connectionState.listen((connectionState) {
-                  if (!mounted) return;
-                  setState(() {
-                    if (connectionState ==
-                        BluetoothConnectionState.connected) {
-                      _state = BtConnectionState.connected;
-                    } else if (connectionState ==
-                        BluetoothConnectionState.disconnected) {
-                      _state = BtConnectionState.disconnected;
-                    }
-                  });
-                });
-
-                // یک بار مانیتور می‌کنیم
-                final cs = await device.connectionState.first;
-                if (!mounted) return;
-                setState(() {
-                  if (cs == BluetoothConnectionState.connected) {
-                    _state = BtConnectionState.connected;
-                  } else {
-                    _state = BtConnectionState.disconnected;
-                  }
-                });
-              } catch (e) {
-                if (!mounted) return;
-                setState(() {
-                  _state = BtConnectionState.error;
-                });
-              }
-            }
-
             Future<void> _disconnect() async {
-              final d = _selectedDevice;
-              if (d == null) return;
+              if (!_connected) return;
               try {
-                await d.disconnect();
-              } catch (_) {}
-              if (!mounted) return;
-              setState(() {
-                _state = BtConnectionState.disconnected;
-              });
+                await widget.device.disconnect();
+              } catch (_) {
+                // نادیده بگیر
+              }
+              if (mounted) {
+                setState(() {
+                  _connected = false;
+                  _services = const [];
+                });
+              }
             }
 
-            Future<void> _sendDemoPayload() async {
-              if (_state != BtConnectionState.connected ||
-                  _selectedDevice == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content:
-                        Text('ابتدا باید به یک دستگاه از طریق بلوتوث متصل شوید.'),
-                  ),
-                );
-                return;
-              }
-
-              final payload = _payloadController.text.trim();
-              if (payload.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('لطفاً متن/مبلغ مورد نظر برای ارسال را وارد کنید.'),
-                  ),
-                );
-                return;
-              }
-
-              setState(() {
-                _sendInProgress = true;
-              });
-
-              // در این نسخه دمو، ما فقط به‌صورت منطقی ارسال را شبیه‌سازی می‌کنیم
-              // (اتصال واقعی بلوتوث برقرار است، اما نوشتن روی Service/Characteristic
-              // به دلیل نیاز به پیکربندی دستگاه مقصد، اینجا پیاده‌سازی نشده است).
-              await Future<void>.delayed(const Duration(seconds: 2));
-
-              if (!mounted) return;
-              setState(() {
-                _sendInProgress = false;
-              });
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      'پیام دمو روی اتصال بلوتوث فعال ثبت شد (متن: "$payload").\nدر نسخه بعدی می‌توان این متن را روی Service خاص نوشت.'),
-                ),
-              );
+            @override
+            void dispose() {
+              _disconnect();
+              super.dispose();
             }
 
             @override
             Widget build(BuildContext context) {
-              return Directionality(
-                textDirection: TextDirection.rtl,
-                child: Scaffold(
-                  appBar: AppBar(
-                    title: const Text('هسته بلوتوث سوما (دمو)'),
+              return Scaffold(
+                appBar: AppBar(
+                  title: Text(
+                    widget.device.name.isNotEmpty
+                        ? widget.device.name
+                        : widget.device.id.id,
                   ),
-                  body: Column(
-                    children: [
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'SOMA Bluetooth Core',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'این صفحه فقط برای تست "اتصال واقعی بلوتوث" و شبیه‌سازی تبادل مبلغ/پیام بین دو دستگاه است.\n'
-                                'نسخه فعلی: اسکن دستگاه‌ها + اتصال واقعی BLE + شبیه‌سازی ارسال پیام روی اتصال.',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                '۱. متن/مبلغ آزمایشی برای ارسال',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextField(
-                                controller: _payloadController,
-                                maxLines: 3,
-                                decoration: InputDecoration(
-                                  hintText:
-                                      'مثال: AMOUNT=75000;DESC=SOMA DEMO PAYMENT;',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              const Text(
-                                '۲. اسکن و انتخاب دستگاه بلوتوث',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                width: double.infinity,
-                                child: FilledButton(
-                                  onPressed:
-                                      _isScanning ? null : () => _startScan(),
-                                  child: Text(
-                                    _isScanning
-                                        ? 'در حال اسکن…'
-                                        : 'اسکن دستگاه‌های نزدیک',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              _buildDevicesList(),
-                              const SizedBox(height: 20),
-                              const Text(
-                                '۳. وضعیت اتصال',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade100,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: Colors.grey.shade300,
-                                  ),
-                                ),
-                                padding: const EdgeInsets.all(12),
-                                child: Text(
-                                  _statusText,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              if (_selectedDevice != null)
-                                Text(
-                                  'دستگاه انتخاب‌شده: ${_selectedDevice!.platformName.isNotEmpty ? _selectedDevice!.platformName : _selectedDevice!.remoteId.str}',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                            ],
+                ),
+                body: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            _connected
+                                ? 'Connected'
+                                : _connecting
+                                    ? 'Connecting...'
+                                    : 'Disconnected',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: _connected ? Colors.green : Colors.red,
+                            ),
                           ),
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: (_selectedDevice != null)
+                          FilledButton(
+                            onPressed: _connecting
+                                ? null
+                                : _connected
                                     ? _disconnect
-                                    : null,
-                                child: const Text('قطع اتصال'),
-                              ),
+                                    : _connect,
+                            child: Text(
+                              _connected
+                                  ? 'Disconnect'
+                                  : _connecting
+                                      ? 'Please wait'
+                                      : 'Connect',
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: (_state ==
-                                            BtConnectionState.connected &&
-                                        !_sendInProgress)
-                                    ? _sendDemoPayload
-                                    : null,
-                                child: _sendInProgress
-                                    ? const Text('در حال ارسال…')
-                                    : const Text('ارسال پیام دمو'),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const Divider(height: 1),
+                    Expanded(
+                      child: _connected
+                          ? _buildServiceList()
+                          : const Center(
+                              child: Text(
+                                'Connect to see services & characteristics',
+                              ),
+                            ),
+                    ),
+                  ],
                 ),
               );
             }
 
-            Widget _buildDevicesList() {
-              if (_state == BtConnectionState.scanning && _results.isEmpty) {
-                return Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: const [
-                      SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'در حال جست‌وجوی دستگاه‌های بلوتوث نزدیک…',
-                          style: TextStyle(fontSize: 13),
-                        ),
-                      ),
-                    ],
-                  ),
+            Widget _buildServiceList() {
+              if (_services.isEmpty) {
+                return const Center(
+                  child: Text('No services discovered yet'),
                 );
               }
 
-              if (_results.isEmpty) {
-                return Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: const Text(
-                    'هنوز دستگاهی دیده نشده است. اسکن را شروع کنید یا بلوتوث دستگاه دیگر را روشن کنید.',
-                    style: TextStyle(fontSize: 13),
-                  ),
-                );
-              }
-
-              return Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                padding: const EdgeInsets.all(4),
-                child: Column(
-                  children: _results.map((r) {
-                    final d = r.device;
-                    final name = d.platformName.isNotEmpty
-                        ? d.platformName
-                        : 'Unknown (${d.remoteId.str})';
-                    final isSelected =
-                        _selectedDevice?.remoteId == d.remoteId;
-
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 4),
-                      child: ListTile(
-                        title: Text(
-                          name,
-                          style: const TextStyle(fontSize: 14),
-                        ),
+              return ListView.builder(
+                itemCount: _services.length,
+                itemBuilder: (context, index) {
+                  final service = _services[index];
+                  return ExpansionTile(
+                    title: Text('Service: ${service.uuid}'),
+                    children: service.characteristics.map((c) {
+                      return ListTile(
+                        title: Text('Characteristic: ${c.uuid}'),
                         subtitle: Text(
-                          'RSSI: ${r.rssi}  •  ID: ${d.remoteId.str}',
-                          style: const TextStyle(fontSize: 11),
+                          'properties: '
+                          '${c.properties.read ? "read " : ""}'
+                          '${c.properties.write ? "write " : ""}'
+                          '${c.properties.notify ? "notify " : ""}',
                         ),
-                        trailing: isSelected
-                            ? const Icon(Icons.check_circle, color: Colors.teal)
-                            : const Icon(Icons.bluetooth),
-                        selected: isSelected,
-                        onTap: () => _connectToDevice(d),
-                      ),
-                    );
-                  }).toList(),
-                ),
+                      );
+                    }).toList(),
+                  );
+                },
               );
             }
           }
-          DART
+          EOF
+
+      - name: Get dependencies
+        run: |
+          cd soma_bluetooth_core
+          flutter pub get
 
       - name: Build soma_bluetooth_core APK (release)
-        working-directory: soma_bluetooth_core
-        run: flutter build apk --release --no-shrink
+        run: |
+          cd soma_bluetooth_core
+          flutter build apk --release --no-shrink
 
       - name: Upload soma_bluetooth_core APK
         uses: actions/upload-artifact@v4
         with:
-          name: soma_bluetooth_core-release.apk
+          name: soma_bluetooth_core-apk
           path: soma_bluetooth_core/build/app/outputs/flutter-apk/app-release.apk
